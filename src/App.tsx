@@ -190,11 +190,7 @@ export default function HotpotTimerApp() {
       </header>
 
       {/* Tab导航 */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(value: string) => setActiveTab(value === "prep" ? "prep" : "cook")}
-        className="w-full"
-      >
+      <Tabs value={activeTab} onValueChange={(value: "cook" | "prep") => setActiveTab(value)} className="w-full">
         <TabsList className="grid w-full grid-cols-2 sticky top-[73px] z-20 mx-auto max-w-screen-md px-4 bg-white/70 backdrop-blur">
           <TabsTrigger value="cook" className="flex items-center gap-2">
             🔥 开煮
