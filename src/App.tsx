@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Bell, BellRing, Check, Timer, Clock, Settings, Volume2, VolumeX, ChevronUp, ChevronDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,19 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { INGREDIENTS, CATEGORIES, RECOMMENDED_INGREDIENTS } from "@/data/ingredients";
+import type { Ingredient } from "@/data/ingredients";
+import {
+  addIngredientToPrepList,
+  addTimerFromPrepItem,
+  calculatePercent,
+  clearDoneTimers,
+  completeDueTimers,
+  createTimerFromIngredient,
+  formatTimeLeft,
+  removePrepItem,
+  updatePrepItemSeconds,
+} from "@/lib/timer-utils";
+import type { PrepItem, TimerItem } from "@/types";
 
 // ----------------------
 // 火锅计时器（Card View）
@@ -48,13 +61,6 @@ function fireNativeNotification(title: string, body?: string) {
   }
 }
 
-function formatTimeLeft(ms: number) {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return m > 0 ? `${m}:${r.toString().padStart(2, "0")}` : `${r}s`;
-}
-
 function useTicking(enabled: boolean, intervalMs = 200) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -63,44 +69,6 @@ function useTicking(enabled: boolean, intervalMs = 200) {
     return () => clearInterval(id);
   }, [enabled, intervalMs]);
   return tick;
-}
-
-// 单个计时条目
-export type TimerItem = {
-  id: string;
-  name: string;
-  emoji?: string;
-  totalMs: number;
-  startAt: number;
-  endAt: number;
-  status: "running" | "paused" | "done";
-  pausedLeftMs?: number; // 暂停时的剩余毫秒
-  note?: string;
-};
-
-// 备菜清单项目
-export type PrepItem = {
-  id: string;
-  ingredientId: string;
-  name: string;
-  emoji: string;
-  seconds: number;
-  customSeconds?: number; // 用户自定义时间（覆盖默认时间）
-  addedAt: number;
-};
-
-function createTimerFromIngredient(ing: (typeof INGREDIENTS)[number], offsetSec = 0): TimerItem {
-  const now = Date.now();
-  const totalMs = (ing.seconds + offsetSec) * 1000;
-  return {
-    id: `${ing.id}_${now}`,
-    name: ing.name,
-    emoji: ing.emoji,
-    totalMs,
-    startAt: now,
-    endAt: now + totalMs,
-    status: "running",
-  };
 }
 
 function saveToStorage(key: string, data: any) {
@@ -138,24 +106,28 @@ export default function HotpotTimerApp() {
   // 驱动重渲染
   const tick = useTicking(true, 200);
 
+  // 所有食材映射
+  const ingredientLookup = useMemo<Map<string, Ingredient>>(
+    () => new Map(INGREDIENTS.map((ingredient) => [ingredient.id, ingredient] as const)),
+    [],
+  );
+
   // 过滤后的食材
-  const filtered = useMemo(() => {
+  const filtered = useMemo<Ingredient[]>(() => {
     const q = query.trim();
-    return INGREDIENTS.filter((i) =>
-      (category === "全部" || i.category === category) &&
-      (q === "" || i.name.includes(q))
+    return INGREDIENTS.filter((ingredient) =>
+      (category === "全部" || ingredient.category === category) &&
+      (q === "" || ingredient.name.includes(q))
     );
   }, [query, category]);
 
   // 计时完成 side effects
   useEffect(() => {
     const now = Date.now();
-    const hasDue = timers.some((t) => t.status === "running" && t.endAt <= now);
-    if (!hasDue) return;
+    const { updated, completedIds } = completeDueTimers(timers, now);
+    if (completedIds.length === 0) return;
 
-    setTimers((prev) =>
-      prev.map((t) => (t.status === "running" && t.endAt <= Date.now() ? { ...t, status: "done" } : t))
-    );
+    setTimers(updated);
 
     if (vibrateOn && navigator.vibrate) navigator.vibrate([180, 100, 180]);
     if (soundOn) playBeep(240, 1100, 0.25);
@@ -170,31 +142,19 @@ export default function HotpotTimerApp() {
     setTimers((prev) => prev.filter((t) => t.id !== id));
   }
 
-  function clearDone() { setTimers((p) => p.filter((t) => t.status !== "done")); }
+  function clearDone() { setTimers((p) => clearDoneTimers(p)); }
 
   // 备菜相关函数
   function addToPrepList(ing: (typeof INGREDIENTS)[number]) {
-    // 检查是否已存在该食材
-    const exists = prepList.some(item => item.ingredientId === ing.id);
-    if (exists) return; // 如果已存在，不添加
-    
-    const newPrepItem: PrepItem = {
-      id: `prep_${ing.id}_${Date.now()}`,
-      ingredientId: ing.id,
-      name: ing.name,
-      emoji: ing.emoji || "🍽️",
-      seconds: ing.seconds,
-      addedAt: Date.now(),
-    };
-    setPrepList((prev) => [newPrepItem, ...prev]);
+    setPrepList((prev) => addIngredientToPrepList(prev, ing));
   }
 
   function removeFromPrepList(id: string) {
-    setPrepList((prev) => prev.filter((p) => p.id !== id));
+    setPrepList((prev) => removePrepItem(prev, id));
   }
 
   function updatePrepTime(id: string, customSeconds: number) {
-    setPrepList((prev) => prev.map((p) => p.id === id ? { ...p, customSeconds } : p));
+    setPrepList((prev) => updatePrepItemSeconds(prev, id, customSeconds));
   }
 
   function clearPrepList() {
@@ -202,21 +162,10 @@ export default function HotpotTimerApp() {
   }
 
   function addFromPrepToTimer(prepItem: PrepItem) {
-    // 使用自定义时间或默认时间
-    const actualSeconds = prepItem.customSeconds || prepItem.seconds;
-    const ing = INGREDIENTS.find(ingredient => ingredient.id === prepItem.ingredientId);
-    if (ing) {
-      // 创建一个临时的ingredient对象，使用自定义时间
-      const customIng = { ...ing, seconds: actualSeconds };
-      addTimer(customIng);
-    }
+    setTimers((prev) => addTimerFromPrepItem(prev, prepItem, ingredientLookup));
   }
 
-  function percent(t: TimerItem) {
-    const total = t.totalMs;
-    const passed = Math.min(total, Math.max(0, (Date.now() - t.startAt)));
-    return Math.round((passed / total) * 100);
-  }
+  function percent(t: TimerItem) { return calculatePercent(t); }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 pb-40">
@@ -241,7 +190,7 @@ export default function HotpotTimerApp() {
       </header>
 
       {/* Tab导航 */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "cook" | "prep")} className="w-full">
+      <Tabs value={activeTab} onValueChange={(value: "cook" | "prep") => setActiveTab(value)} className="w-full">
         <TabsList className="grid w-full grid-cols-2 sticky top-[73px] z-20 mx-auto max-w-screen-md px-4 bg-white/70 backdrop-blur">
           <TabsTrigger value="cook" className="flex items-center gap-2">
             🔥 开煮
@@ -341,8 +290,8 @@ function CookingTab({
       <div className="mb-4">
         <div className="text-sm text-gray-500 mb-2">常用推荐</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {RECOMMENDED_INGREDIENTS.map((id) => {
-            const ing = INGREDIENTS.find((x) => x.id === id)!;
+          {RECOMMENDED_INGREDIENTS.map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
+            const ing = INGREDIENTS.find((item) => item.id === id)!;
             return (
               <Card key={id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
                 onClick={() => onDirectAdd(ing)}>
@@ -412,7 +361,7 @@ function PreparationTab({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
               placeholder="搜索食材（如：毛肚、虾滑）"
               className="pl-9"
             />
@@ -420,7 +369,7 @@ function PreparationTab({
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.map((c: (typeof CATEGORIES)[number]) => (
             <Button 
               key={c} 
               size="sm" 
@@ -521,7 +470,7 @@ function PreparationTab({
 
       {/* 所有食材网格 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {filtered.map((ing) => {
+        {filtered.map((ing: Ingredient) => {
           const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
           return (
             <motion.div key={ing.id} layout>
