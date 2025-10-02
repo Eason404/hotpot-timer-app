@@ -28,23 +28,139 @@ import type { PrepItem, TimerItem } from "@/types";
 // 使用：把此组件放入任意 React（Vite/Next）项目；项目需启用 Tailwind 与 shadcn/ui。
 // ----------------------
 
-// 一个简单的可听提示（不依赖音频文件）
-function playBeep(duration = 250, frequency = 1000, volume = 0.2) {
+// 播放完成提示音 - 更悦耳的"叮咚"声
+function playCompleteSound() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // 检查浏览器是否支持 Web Audio API
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    
+    const ctx = new AudioContextClass();
+    
+    // 确保 AudioContext 处于运行状态
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    
+    // 第一个音符 (高音)
+    const o1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    o1.type = "sine";
+    o1.frequency.setValueAtTime(800, ctx.currentTime);
+    g1.gain.setValueAtTime(0.4, ctx.currentTime);
+    g1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    o1.connect(g1);
+    g1.connect(ctx.destination);
+    o1.start();
+    o1.stop(ctx.currentTime + 0.3);
+    
+    // 第二个音符 (低音) - 延迟0.1秒
+    setTimeout(() => {
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = "sine";
+      o2.frequency.setValueAtTime(600, ctx.currentTime);
+      g2.gain.setValueAtTime(0.3, ctx.currentTime);
+      g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      o2.connect(g2);
+      g2.connect(ctx.destination);
+      o2.start();
+      o2.stop(ctx.currentTime + 0.4);
+      
+      // 清理
+      setTimeout(() => {
+        try {
+          ctx.close();
+        } catch (e) {
+          // 忽略关闭错误
+        }
+      }, 500);
+    }, 100);
+  } catch (error) {
+    // 回退到简单的 beep 声
+    try {
+      const ctx = new ((window as any).webkitAudioContext || window.AudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 800;
+      g.gain.value = 0.3;
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start();
+      setTimeout(() => {
+        o.stop();
+        ctx.close();
+      }, 200);
+    } catch (fallbackError) {
+      // 静默失败
+    }
+  }
+}
+
+// 播放点击反馈音 - 轻快的点击声
+function playClickSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.type = "sine";
-    o.frequency.setValueAtTime(frequency, ctx.currentTime);
-    g.gain.value = volume;
+    o.frequency.setValueAtTime(400, ctx.currentTime);
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
     o.connect(g);
     g.connect(ctx.destination);
     o.start();
+    o.stop(ctx.currentTime + 0.1);
+    
     setTimeout(() => {
-      o.stop();
-      ctx.close();
-    }, duration);
-  } catch {}
+      try {
+        ctx.close();
+      } catch (e) {
+        // 忽略关闭错误
+      }
+    }, 150);
+  } catch (error) {
+    // 静默失败
+  }
+}
+
+// Haptic 触觉反馈函数
+function triggerHapticFeedback(type: 'light' | 'medium' | 'heavy' = 'light') {
+  try {
+    // 检查设备是否支持触觉反馈
+    if ('vibrate' in navigator) {
+      let pattern: number[] = [];
+      
+      switch (type) {
+        case 'light':
+          pattern = [10]; // 轻微震动 10ms
+          break;
+        case 'medium':
+          pattern = [20]; // 中等震动 20ms
+          break;
+        case 'heavy':
+          pattern = [50]; // 重震动 50ms
+          break;
+      }
+      
+      navigator.vibrate(pattern);
+    }
+    
+    // iOS 设备的 Haptic Feedback API (如果可用)
+    if ((window as any).DeviceMotionEvent && typeof (window as any).DeviceMotionEvent.requestPermission === 'function') {
+      // iOS 的 Haptic Feedback 需要特殊处理，但在 web 中比较有限
+      // 这里我们依赖标准的 vibrate API
+    }
+  } catch (error) {
+    // 静默失败 - 不是所有设备都支持触觉反馈
+  }
 }
 
 function requestNotifyPermission() {
@@ -121,20 +237,24 @@ export default function HotpotTimerApp() {
     );
   }, [query, category]);
 
-  // 计时完成 side effects
+  // 检查完成的计时器，播放提示音 & 震动
   useEffect(() => {
-    const now = Date.now();
-    const { updated, completedIds } = completeDueTimers(timers, now);
-    if (completedIds.length === 0) return;
-
-    setTimers(updated);
-
-    if (vibrateOn && navigator.vibrate) navigator.vibrate([180, 100, 180]);
-    if (soundOn) playBeep(240, 1100, 0.25);
-    fireNativeNotification("可以起锅啦！", "有食材到时间了～");
-  }, [tick, timers, soundOn, vibrateOn]);
-
-  function addTimer(ing: (typeof INGREDIENTS)[number]) {
+    const result = completeDueTimers(timers);
+    if (result.completedIds.length === 0) return;
+    
+    setTimers(result.updated);
+    
+    if (vibrateOn && "vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+    
+    // 使用增强的完成提示音
+    if (soundOn) {
+      playCompleteSound();
+    }
+    
+    requestNotifyPermission(); // 尝试请求通知权限
+  }, [tick, timers, soundOn, vibrateOn]);  function addTimer(ing: (typeof INGREDIENTS)[number]) {
+    if (soundOn) playClickSound();
+    if (vibrateOn) triggerHapticFeedback('light');
     setTimers((prev) => [createTimerFromIngredient(ing), ...prev]);
   }
 
@@ -146,6 +266,8 @@ export default function HotpotTimerApp() {
 
   // 备菜相关函数
   function addToPrepList(ing: (typeof INGREDIENTS)[number]) {
+    if (soundOn) playClickSound();
+    if (vibrateOn) triggerHapticFeedback('light');
     setPrepList((prev) => addIngredientToPrepList(prev, ing));
   }
 
@@ -162,6 +284,8 @@ export default function HotpotTimerApp() {
   }
 
   function addFromPrepToTimer(prepItem: PrepItem) {
+    if (soundOn) playClickSound();
+    if (vibrateOn) triggerHapticFeedback('medium');
     setTimers((prev) => addTimerFromPrepItem(prev, prepItem, ingredientLookup));
   }
 
