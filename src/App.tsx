@@ -170,13 +170,6 @@ function requestNotifyPermission() {
   }
 }
 
-function fireNativeNotification(title: string, body?: string) {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "granted") {
-    try { new Notification(title, { body }); } catch {}
-  }
-}
-
 function useTicking(enabled: boolean, intervalMs = 200) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
