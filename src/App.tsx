@@ -265,7 +265,7 @@ function CookingTab({
       {prepList.length > 0 && (
         <div className="mb-6">
           <div className="text-sm text-gray-500 mb-2">备菜清单</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {prepList.map((prepItem) => (
               <Card key={prepItem.id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
                 onClick={() => onAddFromPrepToTimer(prepItem)}>
@@ -293,7 +293,7 @@ function CookingTab({
       {/* 快捷食材（推荐）*/}
       <div className="mb-4">
         <div className="text-sm text-gray-500 mb-2">常用推荐</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
           {RECOMMENDED_INGREDIENTS.map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
             const ing = INGREDIENTS.find((item) => item.id === id)!;
             return (
@@ -459,7 +459,7 @@ function PreparationTab({
       )}
 
       {/* 所有食材网格 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
         {filtered.map((ing: Ingredient) => {
           const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
           return (
@@ -596,7 +596,7 @@ function BottomDock({
                 </div>
                 {isExpanded ? (
                   // Expanded view: 完成的食材使用更紧凑的三列布局
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {done.map((t) => (
                       <div key={t.id} className="opacity-90">
                         <TimerChip item={t} onRemove={onRemove} percent={100} />
@@ -680,14 +680,19 @@ function TimerChip({
     }`}
     onClick={() => onRemove(item.id)}
     >
-      {/* 进度条作为背景 - 加深颜色 */}
+      {/* 进度条作为背景 - 使用更有食欲的红棕色渐变 */}
       <div 
         className={`absolute inset-0 transition-all duration-300`} 
         style={{ 
           width: isDone ? '100%' : `${percent}%`,
           background: isDone 
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)'
-            : `linear-gradient(to right, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 70%, transparent 100%)`
+            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.12) 100%)'
+            : `linear-gradient(to right, 
+                rgba(239, 68, 68, 0.25) 0%, 
+                rgba(220, 38, 38, 0.18) 25%,
+                rgba(185, 28, 28, 0.15) 50%,
+                rgba(153, 27, 27, 0.08) 75%,
+                transparent 100%)`
         }} 
       />
       
@@ -717,12 +722,12 @@ function TimerChip({
                     strokeWidth="2.5"
                     fill="none"
                   />
-                  {/* 进度圆环 */}
+                  {/* 进度圆环 - 使用红棕色 */}
                   <circle
                     cx="16"
                     cy="16"
                     r="12"
-                    stroke="rgb(59 130 246)"
+                    stroke="rgb(220, 38, 38)"
                     strokeWidth="2.5"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 12}`}
