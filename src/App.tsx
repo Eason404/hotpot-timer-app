@@ -405,68 +405,54 @@ function PreparationTab({
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-2">
+          <div className="flex flex-wrap gap-2">
             {prepList.map((prepItem) => (
-              <Card key={prepItem.id} className="border-blue-200 bg-blue-50/30">
-                <CardContent className="p-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{prepItem.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{prepItem.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
-                          ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}分钟` 
-                          : `${prepItem.customSeconds || prepItem.seconds}秒`}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => {
-                          const currentTime = prepItem.customSeconds || prepItem.seconds;
-                          const newTime = Math.max(15, currentTime - 15); // 最少15秒
-                          onUpdatePrepTime(prepItem.id, newTime);
-                        }}
-                        className="w-7 h-7 p-0 text-xs"
-                        title="减少15秒"
-                      >
-                        -
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="w-7 h-7 p-0"
-                        title="设置时间"
-                      >
-                        <Settings className="w-3 h-3" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => {
-                          const currentTime = prepItem.customSeconds || prepItem.seconds;
-                          const newTime = currentTime + 15; // 增加15秒
-                          onUpdatePrepTime(prepItem.id, newTime);
-                        }}
-                        className="w-7 h-7 p-0 text-xs"
-                        title="增加15秒"
-                      >
-                        +
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => onRemoveFromPrepList(prepItem.id)}
-                        className="w-7 h-7 p-0 text-gray-400 hover:text-red-600"
-                        title="移除"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={prepItem.id} className="flex items-center gap-1.5 bg-blue-50/50 border border-blue-200 rounded-full px-4 py-2 text-xs">
+                <span className="text-sm">{prepItem.emoji}</span>
+                <span className="font-medium">{prepItem.name}</span>
+                <span className="text-gray-500">
+                  {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
+                    ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}m` 
+                    : `${prepItem.customSeconds || prepItem.seconds}s`}
+                </span>
+                <div className="flex items-center gap-1 ml-1">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => {
+                      const currentTime = prepItem.customSeconds || prepItem.seconds;
+                      const newTime = Math.max(15, currentTime - 15);
+                      onUpdatePrepTime(prepItem.id, newTime);
+                    }}
+                    className="w-5 h-5 p-0 text-xs hover:bg-blue-100 rounded-full"
+                    title="减少15秒"
+                  >
+                    -
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => {
+                      const currentTime = prepItem.customSeconds || prepItem.seconds;
+                      const newTime = currentTime + 15;
+                      onUpdatePrepTime(prepItem.id, newTime);
+                    }}
+                    className="w-5 h-5 p-0 text-xs hover:bg-blue-100 rounded-full"
+                    title="增加15秒"
+                  >
+                    +
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => onRemoveFromPrepList(prepItem.id)}
+                    className="w-5 h-5 p-0 text-xs text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full ml-0.5"
+                    title="移除"
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         </div>
