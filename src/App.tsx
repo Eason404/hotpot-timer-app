@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Bell, BellRing, Check, Plus, Pause, Play, X, Timer, Clock, Settings, Volume2, VolumeX } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, Bell, BellRing, Check, Pause, Play, X, Timer, Clock, Settings, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 
 // ----------------------
 // 火锅计时器（Card View）
@@ -195,10 +194,6 @@ export default function HotpotTimerApp() {
     setTimers((prev) => [createTimerFromIngredient(ing), ...prev]);
   }
 
-  function addTimerWithAdjust(ing: (typeof INGREDIENTS)[number], secondsDelta: number) {
-    setTimers((prev) => [createTimerFromIngredient(ing, secondsDelta), ...prev]);
-  }
-
   function pauseResumeTimer(id: string) {
     setTimers((prev) =>
       prev.map((t) => {
@@ -273,8 +268,17 @@ export default function HotpotTimerApp() {
 
         <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
           {CATEGORIES.map((c) => (
-            <Button key={c} size="sm" variant={category === c ? "default" : "outline"} className="rounded-full"
-              onClick={() => setCategory(c)}>
+            <Button 
+              key={c} 
+              size="sm" 
+              variant={category === c ? "default" : "outline"} 
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                category === c 
+                  ? 'bg-primary text-primary-foreground shadow-md' 
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => setCategory(c)}
+            >
               {c}
             </Button>
           ))}
@@ -288,17 +292,21 @@ export default function HotpotTimerApp() {
           {["beef_roll", "tripe", "shrimp_paste", "fish_ball", "enoki", "tofu", "glass_noodle", "shrimp"].map((id) => {
             const ing = INGREDIENTS.find((x) => x.id === id)!;
             return (
-              <Card key={id} className="hover:shadow transition cursor-pointer" onClick={() => addTimer(ing)}>
+              <Card key={id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
+                onClick={() => addTimer(ing)}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{ing.emoji}</span>
+                    <span className="text-2xl">{ing.emoji}</span>
                     <div>
                       <div className="font-medium leading-tight">{ing.name}</div>
-                      <div className="text-xs text-gray-500">{Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}</div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
+                      </div>
                     </div>
                   </div>
-                  <Button size="icon" variant="secondary"><Plus className="w-4 h-4" /></Button>
                 </CardContent>
+                {/* Subtle hover indicator */}
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
               </Card>
             );
           })}
@@ -310,20 +318,24 @@ export default function HotpotTimerApp() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {filtered.map((ing) => (
             <motion.div key={ing.id} layout>
-              <Card className="hover:shadow-md transition relative">
+              <Card className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group" 
+                onClick={() => addTimer(ing)}>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center justify-between text-base">
-                    <span className="flex items-center gap-2"><span className="text-xl">{ing.emoji}</span>{ing.name}</span>
-                    <Badge variant="secondary">{Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}</Badge>
+                    <span className="flex items-center gap-2">
+                      <span className="text-2xl">{ing.emoji}</span>
+                      {ing.name}
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {ing.hint && <div className="text-xs text-gray-500 mb-2">{ing.hint}</div>}
-                  <div className="flex items-center gap-2">
-                    <Button className="flex-1" onClick={() => addTimer(ing)}>开始</Button>
-                    <AdjustButton onConfirm={(delta) => addTimerWithAdjust(ing, delta)} />
-                  </div>
+                  {ing.hint && <div className="text-xs text-gray-500 mb-3">{ing.hint}</div>}
                 </CardContent>
+                {/* Subtle hover indicator */}
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
               </Card>
             </motion.div>
           ))}
@@ -341,36 +353,6 @@ export default function HotpotTimerApp() {
         percent={percent}
       />
     </div>
-  );
-}
-
-function AdjustButton({ onConfirm }: { onConfirm: (deltaSeconds: number) => void }) {
-  const [open, setOpen] = useState(false);
-  const [delta, setDelta] = useState(0);
-  return (
-    <>
-      <Button variant="outline" onClick={() => setOpen(true)} title="微调时长">±秒</Button>
-      <AnimatePresence>
-        {open && (
-          <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-            <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
-              className="relative z-10 w-full sm:w-[420px] bg-white rounded-t-2xl sm:rounded-2xl p-4 shadow-xl">
-              <div className="font-medium mb-2">微调推荐时长（-60s ~ +60s）</div>
-              <div className="px-2">
-                <Slider min={-60} max={60} step={5} value={[delta]} onValueChange={(v) => setDelta(v[0])} />
-                <div className="text-center text-sm text-gray-600 mt-2">{delta > 0 ? `+${delta}s` : `${delta}s`}</div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Button className="flex-1" onClick={() => { onConfirm(delta); setOpen(false); }}>加入并开始</Button>
-                <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">取消</Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
   );
 }
 
@@ -449,29 +431,66 @@ function TimerChip({
   const isDone = item.status === "done";
 
   return (
-    <Card className={`border ${isDone ? "border-emerald-300 bg-emerald-50" : ""}`}>
+    <Card className={`border-2 transition-all ${
+      isDone 
+        ? "border-emerald-300 bg-emerald-50 shadow-md" 
+        : "border-gray-200 bg-white hover:shadow-md"
+    }`}>
       <CardContent className="p-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="text-lg">{item.emoji}</div>
-          <div className="font-medium truncate flex-1">{item.name}</div>
-          <div className="text-xs tabular-nums">{leftText}</div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="text-xl">{item.emoji}</div>
+          <div className="font-semibold truncate flex-1">{item.name}</div>
+          <div className={`text-sm font-mono px-2 py-1 rounded-md ${
+            isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'
+          }`}>
+            {leftText}
+          </div>
         </div>
-        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-gray-800" style={{ width: `${percent}%` }} />
+        <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden mb-3">
+          <div 
+            className={`h-full transition-all duration-300 rounded-full ${
+              isDone ? 'bg-emerald-500' : 'bg-primary'
+            }`} 
+            style={{ width: `${percent}%` }} 
+          />
         </div>
-        <div className="flex items-center gap-1 mt-2">
+        <div className="flex items-center gap-2">
           {!isDone && (
-            <Button size="icon" variant="secondary" onClick={() => onPauseResume(item.id)} title={item.status === "paused" ? "继续" : "暂停"}>
-              {item.status === "paused" ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => onPauseResume(item.id)} 
+              className="px-3"
+              title={item.status === "paused" ? "继续" : "暂停"}
+            >
+              {item.status === "paused" ? <Play className="w-3 h-3 mr-1" /> : <Pause className="w-3 h-3 mr-1" />}
+              {item.status === "paused" ? "继续" : "暂停"}
             </Button>
           )}
           {isDone ? (
-            <Button size="sm" variant="default" className="ml-auto" onClick={() => onRemove(item.id)}><Check className="w-4 h-4 mr-1" />知道了</Button>
+            <Button 
+              size="sm" 
+              variant="default" 
+              className="ml-auto bg-emerald-600 hover:bg-emerald-700" 
+              onClick={() => onRemove(item.id)}
+            >
+              <Check className="w-4 h-4 mr-1" />知道了
+            </Button>
           ) : (
             <>
-              <Button size="sm" variant="outline" onClick={() => onSnooze(item.id, 30)}>+30s</Button>
-              <Button size="sm" variant="outline" onClick={() => onSnooze(item.id, 60)}>+60s</Button>
-              <Button size="icon" variant="ghost" className="ml-auto" onClick={() => onRemove(item.id)} title="移除">
+              <Button size="sm" variant="ghost" onClick={() => onSnooze(item.id, 30)} className="text-xs px-2">
+                +30s
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onSnooze(item.id, 60)} className="text-xs px-2">
+                +60s
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="ml-auto p-1 h-8 w-8 text-gray-400 hover:text-gray-600" 
+                onClick={() => onRemove(item.id)} 
+                title="移除"
+              >
                 <X className="w-4 h-4" />
               </Button>
             </>
