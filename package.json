@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "npm run test:build && node --test dist-tests/tests",
+    "test:build": "tsc --project tsconfig.test.json",
+    "test:watch": "tsc --project tsconfig.test.json --watch",
     "preview": "vite preview"
   },
   "dependencies": {
