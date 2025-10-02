@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { INGREDIENTS, CATEGORIES, RECOMMENDED_INGREDIENTS, type Ingredient } from "@/data/ingredients";
+import { INGREDIENTS, CATEGORIES, RECOMMENDED_INGREDIENTS } from "@/data/ingredients";
 
 // ----------------------
 // 火锅计时器（Card View）
