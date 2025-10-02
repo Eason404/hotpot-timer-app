@@ -152,32 +152,8 @@ export default function HotpotTimerApp() {
     setTimers((prev) => [createTimerFromIngredient(ing), ...prev]);
   }
 
-  function pauseResumeTimer(id: string) {
-    setTimers((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        if (t.status === "running") {
-          const left = t.endAt - Date.now();
-          return { ...t, status: "paused", pausedLeftMs: Math.max(0, left) };
-        }
-        if (t.status === "paused") {
-          const now = Date.now();
-          const left = t.pausedLeftMs ?? 0;
-          return { ...t, status: "running", startAt: now, endAt: now + left, pausedLeftMs: undefined };
-        }
-        return t;
-      })
-    );
-  }
-
   function removeTimer(id: string) {
     setTimers((prev) => prev.filter((t) => t.id !== id));
-  }
-
-  function snoozeTimer(id: string, addSeconds = 30) {
-    setTimers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: "running", endAt: Date.now() + addSeconds * 1000 } : t))
-    );
   }
 
   function clearDone() { setTimers((p) => p.filter((t) => t.status !== "done")); }
