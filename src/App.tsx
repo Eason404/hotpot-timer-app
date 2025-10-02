@@ -2,7 +2,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Bell, BellRing, Check, Timer, Clock, Settings, Volume2, VolumeX, ChevronUp, ChevronDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +14,6 @@ import {
   calculatePercent,
   clearDoneTimers,
   completeDueTimers,
-  createTimerFromIngredient,
   formatTimeLeft,
   removePrepItem,
   updatePrepItemSeconds,
@@ -245,11 +244,7 @@ export default function HotpotTimerApp() {
     }
     
     requestNotifyPermission(); // 尝试请求通知权限
-  }, [tick, timers, soundOn, vibrateOn]);  function addTimer(ing: (typeof INGREDIENTS)[number]) {
-    if (soundOn) playClickSound();
-    if (vibrateOn) triggerHapticFeedback('light');
-    setTimers((prev) => [createTimerFromIngredient(ing), ...prev]);
-  }
+  }, [tick, timers, soundOn, vibrateOn]);
 
   function removeTimer(id: string) {
     setTimers((prev) => prev.filter((t) => t.id !== id));
@@ -330,7 +325,7 @@ export default function HotpotTimerApp() {
             percent={percent}
             prepList={prepList}
             onAddFromPrepToTimer={addFromPrepToTimer}
-            onDirectAdd={addTimer}
+            onSwitchToPrep={() => setActiveTab("prep")}
           />
         </TabsContent>
 
@@ -363,7 +358,7 @@ function CookingTab({
   percent,
   prepList,
   onAddFromPrepToTimer,
-  onDirectAdd,
+  onSwitchToPrep,
 }: {
   timers: TimerItem[];
   onRemoveTimer: (id: string) => void;
@@ -371,9 +366,23 @@ function CookingTab({
   percent: (t: TimerItem) => number;
   prepList: PrepItem[];
   onAddFromPrepToTimer: (prepItem: PrepItem) => void;
-  onDirectAdd: (ing: (typeof INGREDIENTS)[number]) => void;
+  onSwitchToPrep: () => void;
 }) {
-  const running = timers.filter((t) => t.status !== "done");
+  const running = timers.filter((t) => t.status !== "done").sort((a, b) => {
+    // 按剩余时间排序，剩余时间最少的排在前面
+    // 这样快要煮好的食材会优先显示
+    const now = Date.now();
+    const timeLeftA = Math.max(0, a.endAt - now);
+    const timeLeftB = Math.max(0, b.endAt - now);
+    
+    // 如果都已经到时间了（剩余时间为0），按结束时间排序（先完成的在前）
+    if (timeLeftA === 0 && timeLeftB === 0) {
+      return a.endAt - b.endAt;
+    }
+    
+    // 否则按剩余时间排序
+    return timeLeftA - timeLeftB;
+  });
   const done = timers.filter((t) => t.status === "done");
 
   return (
@@ -407,33 +416,23 @@ function CookingTab({
         </div>
       )}
 
-      {/* 快捷食材（推荐）*/}
-      <div className="mb-4">
-        <div className="text-sm text-gray-500 mb-2">常用推荐</div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-          {RECOMMENDED_INGREDIENTS.map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
-            const ing = INGREDIENTS.find((item) => item.id === id)!;
-            return (
-              <Card key={id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
-                onClick={() => onDirectAdd(ing)}>
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{ing.emoji}</span>
-                    <div>
-                      <div className="font-medium leading-tight">{ing.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-                {/* Subtle hover indicator */}
-                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
-              </Card>
-            );
-          })}
+      {/* 温馨提示：引导用户先备菜 */}
+      {prepList.length === 0 && (
+        <div className="mb-6 text-center py-8">
+          <div className="text-6xl mb-4">🍲</div>
+          <div className="text-lg font-medium text-gray-700 mb-2">开始你的火锅之旅</div>
+          <div className="text-sm text-gray-500 mb-4">
+            建议先到"备菜"页面选择今天要吃的食材<br />
+            然后回来这里开始计时哦～
+          </div>
+          <Button 
+            onClick={onSwitchToPrep}
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            去备菜 🛒
+          </Button>
         </div>
-      </div>
+      )}
 
       {/* 底部活动计时器栏 */}
       <BottomDock
@@ -475,6 +474,102 @@ function PreparationTab({
 }) {
   return (
     <div className="mx-auto max-w-screen-md px-4 pt-4">
+      {/* 备菜清单 - 置顶显示，最重要 */}
+      {prepList.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold">� 我的备菜 ({prepList.length})</div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={onClearPrepList}>
+                清空
+              </Button>
+              <Button size="sm" onClick={onSwitchToCook}>
+                开始下锅
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {prepList.map((prepItem) => (
+              <div key={prepItem.id} className="flex items-center gap-1.5 bg-orange-50/80 border border-orange-200 rounded-full px-4 py-2 text-xs">
+                <span className="text-sm">{prepItem.emoji}</span>
+                <span className="font-medium">{prepItem.name}</span>
+                <span className="text-gray-500">
+                  {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
+                    ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}m` 
+                    : `${prepItem.customSeconds || prepItem.seconds}s`}
+                </span>
+                <div className="flex items-center gap-1 ml-1">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => {
+                      const currentTime = prepItem.customSeconds || prepItem.seconds;
+                      const newTime = Math.max(15, currentTime - 15);
+                      onUpdatePrepTime(prepItem.id, newTime);
+                    }}
+                    className="w-5 h-5 p-0 text-xs hover:bg-orange-100 rounded-full"
+                    title="减少15秒"
+                  >
+                    -
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => {
+                      const currentTime = prepItem.customSeconds || prepItem.seconds;
+                      const newTime = currentTime + 15;
+                      onUpdatePrepTime(prepItem.id, newTime);
+                    }}
+                    className="w-5 h-5 p-0 text-xs hover:bg-orange-100 rounded-full"
+                    title="增加15秒"
+                  >
+                    +
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => onRemoveFromPrepList(prepItem.id)}
+                    className="w-5 h-5 p-0 text-xs text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full ml-0.5"
+                    title="移除"
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 常用推荐 - 紧凑版本 */}
+      <div className="mb-4">
+        <div className="text-sm font-medium text-gray-600 mb-2">🔥 常用推荐</div>
+        <div className="flex flex-wrap gap-2">
+          {RECOMMENDED_INGREDIENTS.map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
+            const ing = INGREDIENTS.find((item) => item.id === id)!;
+            const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
+            return (
+              <motion.div key={ing.id} layout>
+                <Button
+                  size="sm"
+                  variant={isInPrepList ? "default" : "outline"}
+                  onClick={() => onAddToPrepList(ing)}
+                  className={`h-8 px-3 rounded-full text-xs transition-all ${
+                    isInPrepList 
+                      ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' 
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-sm mr-1">{ing.emoji}</span>
+                  {ing.name}
+                  {isInPrepList && <span className="ml-1 text-green-600">✓</span>}
+                </Button>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 搜索 & 分类 */}
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-3">
@@ -508,100 +603,32 @@ function PreparationTab({
         </div>
       </div>
 
-      {/* 备菜清单 */}
-      {prepList.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-lg font-semibold">备菜清单 ({prepList.length})</div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={onClearPrepList}>
-                清空
-              </Button>
-              <Button size="sm" onClick={onSwitchToCook}>
-                开始下锅
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {prepList.map((prepItem) => (
-              <div key={prepItem.id} className="flex items-center gap-1.5 bg-blue-50/50 border border-blue-200 rounded-full px-4 py-2 text-xs">
-                <span className="text-sm">{prepItem.emoji}</span>
-                <span className="font-medium">{prepItem.name}</span>
-                <span className="text-gray-500">
-                  {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
-                    ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}m` 
-                    : `${prepItem.customSeconds || prepItem.seconds}s`}
-                </span>
-                <div className="flex items-center gap-1 ml-1">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => {
-                      const currentTime = prepItem.customSeconds || prepItem.seconds;
-                      const newTime = Math.max(15, currentTime - 15);
-                      onUpdatePrepTime(prepItem.id, newTime);
-                    }}
-                    className="w-5 h-5 p-0 text-xs hover:bg-blue-100 rounded-full"
-                    title="减少15秒"
-                  >
-                    -
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => {
-                      const currentTime = prepItem.customSeconds || prepItem.seconds;
-                      const newTime = currentTime + 15;
-                      onUpdatePrepTime(prepItem.id, newTime);
-                    }}
-                    className="w-5 h-5 p-0 text-xs hover:bg-blue-100 rounded-full"
-                    title="增加15秒"
-                  >
-                    +
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => onRemoveFromPrepList(prepItem.id)}
-                    className="w-5 h-5 p-0 text-xs text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full ml-0.5"
-                    title="移除"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 所有食材网格 */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+      {/* 所有食材网格 - 紧凑版 */}
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
         {filtered.map((ing: Ingredient) => {
           const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
           return (
             <motion.div key={ing.id} layout>
-              <Card className={`hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group ${
-                isInPrepList ? 'border-green-200 bg-green-50/30' : ''
+              <Card className={`hover:shadow-md hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group ${
+                isInPrepList ? 'border-green-200 bg-green-50/50' : 'border-gray-100'
               }`} 
                 onClick={() => onAddToPrepList(ing)}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span className="flex items-center gap-2">
-                      <span className="text-2xl">{ing.emoji}</span>
-                      {ing.name}
-                      {isInPrepList && <span className="text-green-600 text-sm">✓</span>}
-                    </span>
-                    <Badge variant="secondary" className="text-xs">
-                      {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
+                <CardContent className="p-3">
+                  <div className="text-center">
+                    <div className="text-xl mb-1">{ing.emoji}</div>
+                    <div className="text-xs font-medium truncate mb-1">{ing.name}</div>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                      {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}m` : `${ing.seconds}s`}
                     </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {ing.hint && <div className="text-xs text-gray-500 mb-3">{ing.hint}</div>}
+                    {isInPrepList && (
+                      <div className="absolute top-1 right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">✓</span>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
                 {/* Hover indicator */}
-                <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
+                <div className="absolute inset-0 bg-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
               </Card>
             </motion.div>
           );
@@ -797,7 +824,7 @@ function TimerChip({
     }`}
     onClick={() => onRemove(item.id)}
     >
-      {/* 进度条作为背景 - 使用更有食欲的红棕色渐变 */}
+      {/* 进度条作为背景 - 使用温暖橙色系 */}
       <div 
         className={`absolute inset-0 transition-all duration-300`} 
         style={{ 
@@ -805,10 +832,10 @@ function TimerChip({
           background: isDone 
             ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.12) 100%)'
             : `linear-gradient(to right, 
-                rgba(239, 68, 68, 0.25) 0%, 
-                rgba(220, 38, 38, 0.18) 25%,
-                rgba(185, 28, 28, 0.15) 50%,
-                rgba(153, 27, 27, 0.08) 75%,
+                rgba(251, 146, 60, 0.25) 0%, 
+                rgba(249, 115, 22, 0.18) 25%,
+                rgba(234, 88, 12, 0.15) 50%,
+                rgba(194, 65, 12, 0.08) 75%,
                 transparent 100%)`
         }} 
       />
@@ -839,12 +866,12 @@ function TimerChip({
                     strokeWidth="2.5"
                     fill="none"
                   />
-                  {/* 进度圆环 - 使用红棕色 */}
+                  {/* 进度圆环 - 使用温暖橙色 */}
                   <circle
                     cx="16"
                     cy="16"
                     r="12"
-                    stroke="rgb(220, 38, 38)"
+                    stroke="rgb(249, 115, 22)"
                     strokeWidth="2.5"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 12}`}
