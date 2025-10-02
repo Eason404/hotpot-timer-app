@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { INGREDIENTS, CATEGORIES, RECOMMENDED_INGREDIENTS, type Ingredient } from "@/data/ingredients";
 
 // ----------------------
 // 火锅计时器（Card View）
@@ -12,50 +13,6 @@ import { Input } from "@/components/ui/input";
 // 设计目标：移动优先、点卡片即可开计时、支持多份、完成提醒（声/震/通知）、UI简洁。
 // 使用：把此组件放入任意 React（Vite/Next）项目；项目需启用 Tailwind 与 shadcn/ui。
 // ----------------------
-
-// 推荐食材与默认时间（秒）。时间取中式火锅常见“熟透/最佳口感”建议值。
-const INGREDIENTS: Array<{
-  id: string;
-  name: string;
-  emoji?: string;
-  seconds: number; // 推荐时长（秒）
-  category: "肉类" | "内脏/爽脆" | "丸滑/加工" | "海鲜" | "蔬菜菌菇" | "豆制品/主食" | "其他";
-  hint?: string;
-}> = [
-  { id: "beef_roll", name: "肥牛卷", emoji: "🥩", seconds: 45, category: "肉类", hint: "涮至变色即可" },
-  { id: "lamb_slice", name: "羊肉片", emoji: "🥩", seconds: 60, category: "肉类" },
-  { id: "tripe", name: "毛肚", emoji: "🐄", seconds: 15, category: "内脏/爽脆", hint: "七上八下 ~15s" },
-  { id: "duck_intestine", name: "鸭肠", emoji: "🦆", seconds: 20, category: "内脏/爽脆" },
-  { id: "artery", name: "黄喉", emoji: "✨", seconds: 120, category: "内脏/爽脆" },
-  { id: "shrimp_paste", name: "虾滑", emoji: "🍤", seconds: 180, category: "丸滑/加工" },
-  { id: "beef_ball", name: "牛筋丸", emoji: "🥣", seconds: 420, category: "丸滑/加工" },
-  { id: "fish_ball", name: "鱼丸", emoji: "🐟", seconds: 300, category: "丸滑/加工" },
-  { id: "luncheon", name: "午餐肉", emoji: "🥫", seconds: 120, category: "丸滑/加工" },
-  { id: "shrimp", name: "鲜虾", emoji: "🦐", seconds: 180, category: "海鲜" },
-  { id: "crab_stick", name: "蟹棒", emoji: "🦀", seconds: 120, category: "海鲜" },
-  { id: "enoki", name: "金针菇", emoji: "🍄", seconds: 120, category: "蔬菜菌菇" },
-  { id: "mushroom_mix", name: "菌菇拼", emoji: "🍄", seconds: 180, category: "蔬菜菌菇" },
-  { id: "lotus", name: "藕片", emoji: "🥢", seconds: 180, category: "蔬菜菌菇" },
-  { id: "spinach", name: "菠菜", emoji: "🥬", seconds: 60, category: "蔬菜菌菇" },
-  { id: "kelp_knot", name: "海带结", emoji: "🔗", seconds: 300, category: "蔬菜菌菇" },
-  { id: "tofu", name: "北豆腐", emoji: "🧊", seconds: 180, category: "豆制品/主食" },
-  { id: "frozen_tofu", name: "冻豆腐", emoji: "🧊", seconds: 300, category: "豆制品/主食" },
-  { id: "tofu_skin", name: "千张/百叶", emoji: "🧆", seconds: 90, category: "豆制品/主食" },
-  { id: "glass_noodle", name: "粉丝", emoji: "🍜", seconds: 240, category: "豆制品/主食" },
-  { id: "wide_noodle", name: "宽粉", emoji: "🍜", seconds: 300, category: "豆制品/主食" },
-  { id: "corn", name: "玉米段", emoji: "🌽", seconds: 480, category: "其他" },
-];
-
-const CATEGORIES = [
-  "全部",
-  "肉类",
-  "内脏/爽脆",
-  "丸滑/加工",
-  "海鲜",
-  "蔬菜菌菇",
-  "豆制品/主食",
-  "其他",
-] as const;
 
 // 一个简单的可听提示（不依赖音频文件）
 function playBeep(duration = 250, frequency = 1000, volume = 0.2) {
@@ -289,7 +246,7 @@ export default function HotpotTimerApp() {
       <div className="mx-auto max-w-screen-md px-4 mt-4">
         <div className="text-sm text-gray-500 mb-2">常用推荐</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {["beef_roll", "tripe", "shrimp_paste", "fish_ball", "enoki", "tofu", "glass_noodle", "shrimp"].map((id) => {
+          {RECOMMENDED_INGREDIENTS.map((id) => {
             const ing = INGREDIENTS.find((x) => x.id === id)!;
             return (
               <Card key={id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
