@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Bell, BellRing, Check, Pause, Play, X, Timer, Clock, Settings, Volume2, VolumeX, ChevronUp, ChevronDown, Minus } from "lucide-react";
+import { Search, Bell, BellRing, Check, Timer, Clock, Settings, Volume2, VolumeX, ChevronUp, ChevronDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -304,9 +304,7 @@ export default function HotpotTimerApp() {
       <BottomDock
         running={running}
         done={done}
-        onPauseResume={pauseResumeTimer}
         onRemove={removeTimer}
-        onSnooze={snoozeTimer}
         onClearDone={clearDone}
         percent={percent}
       />
@@ -317,17 +315,13 @@ export default function HotpotTimerApp() {
 function BottomDock({
   running,
   done,
-  onPauseResume,
   onRemove,
-  onSnooze,
   onClearDone,
   percent,
 }: {
   running: TimerItem[];
   done: TimerItem[];
-  onPauseResume: (id: string) => void;
   onRemove: (id: string) => void;
-  onSnooze: (id: string, addSeconds?: number) => void;
   onClearDone: () => void;
   percent: (t: TimerItem) => number;
 }) {
@@ -343,7 +337,7 @@ function BottomDock({
     }
   }, [totalTimers]);
 
-  const showExpandButton = running.length > 2 || (running.length > 0 && done.length > 0);
+  const showExpandButton = running.length > 2 || done.length > 2 || (running.length > 0 && done.length > 0);
 
   // Don't render if no timers and minimized
   if (totalTimers === 0 && isMinimized) return null;
@@ -404,47 +398,10 @@ function BottomDock({
         {/* Content - hide when minimized */}
         {!isMinimized && (
           <>
-            {/* Running section */}
-            <motion.div
-              initial={false}
-              animate={{
-                height: isExpanded ? "auto" : running.length === 0 ? "auto" : "60px"
-              }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className={`overflow-hidden ${running.length === 0 ? '' : isExpanded ? '' : 'overflow-hidden'}`}
-            >
-              {running.length === 0 ? (
-                <div className="text-sm text-gray-500">锅里空空的，点上面的食材卡片开始煮吧～</div>
-              ) : isExpanded ? (
-                // Expanded view: 保持原有卡片尺寸，可以并排显示
-                <div className="flex gap-2 flex-wrap">
-                  {running.map((t) => (
-                    <div key={t.id} className="w-[220px]">
-                      <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={percent(t)} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                // Collapsed view: Horizontal scroll
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                  {running.slice(0, 2).map((t) => (
-                    <div key={t.id} className="shrink-0 w-[220px]">
-                      <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={percent(t)} />
-                    </div>
-                  ))}
-                  {running.length > 2 && (
-                    <div className="shrink-0 w-[100px] flex items-center justify-center text-sm text-gray-500">
-                      +{running.length - 2} 还在煮...
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-
-            {/* Done section - only show when expanded or when there are no running timers */}
-            {done.length > 0 && (isExpanded || running.length === 0) && (
+            {/* Done section - 出锅啦的食物显示在最上面 */}
+            {done.length > 0 && (
               <motion.div 
-                className="mt-3"
+                className="mb-3"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
@@ -456,11 +413,11 @@ function BottomDock({
                   <Button size="sm" variant="ghost" className="ml-auto" onClick={onClearDone}>全部盛起</Button>
                 </div>
                 {isExpanded ? (
-                  // Expanded view: 保持原有卡片尺寸，可以并排显示
-                  <div className="flex gap-2 flex-wrap">
+                  // Expanded view: 完成的食材使用更紧凑的三列布局
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {done.map((t) => (
-                      <div key={t.id} className="w-[220px] opacity-90">
-                        <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={100} />
+                      <div key={t.id} className="opacity-90">
+                        <TimerChip item={t} onRemove={onRemove} percent={100} />
                       </div>
                     ))}
                   </div>
@@ -468,14 +425,51 @@ function BottomDock({
                   // Collapsed view: Horizontal scroll
                   <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                     {done.map((t) => (
-                      <div key={t.id} className="shrink-0 w-[220px] opacity-90">
-                        <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={100} />
+                      <div key={t.id} className="shrink-0 w-[160px] opacity-90">
+                        <TimerChip item={t} onRemove={onRemove} percent={100} />
                       </div>
                     ))}
                   </div>
                 )}
               </motion.div>
             )}
+
+            {/* Running section - 在锅里的食物显示在下面 */}
+            <motion.div
+              initial={false}
+              animate={{
+                height: isExpanded ? "auto" : running.length === 0 ? "auto" : "60px"
+              }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className={`overflow-hidden ${running.length === 0 ? '' : isExpanded ? '' : 'overflow-hidden'}`}
+            >
+              {running.length === 0 ? (
+                <div className="text-sm text-gray-500">锅里空空的，点上面的食材卡片开始煮吧～</div>
+              ) : isExpanded ? (
+                // Expanded view: 响应式网格布局
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {running.map((t) => (
+                    <div key={t.id}>
+                      <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Collapsed view: Horizontal scroll
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {running.slice(0, 2).map((t) => (
+                    <div key={t.id} className="shrink-0 w-[220px]">
+                      <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
+                    </div>
+                  ))}
+                  {running.length > 2 && (
+                    <div className="shrink-0 w-[100px] flex items-center justify-center text-sm text-gray-500">
+                      +{running.length - 2} 还在煮...
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
           </>
         )}
       </motion.div>
@@ -485,97 +479,81 @@ function BottomDock({
 
 function TimerChip({
   item,
-  onPauseResume,
   onRemove,
-  onSnooze,
   percent,
 }: {
   item: TimerItem;
-  onPauseResume: (id: string) => void;
   onRemove: (id: string) => void;
-  onSnooze: (id: string, addSeconds?: number) => void;
   percent: number;
 }) {
-  const leftMs = item.status === "paused" ? (item.pausedLeftMs ?? 0) : Math.max(0, item.endAt - Date.now());
+  const leftMs = Math.max(0, item.endAt - Date.now());
   const leftText = formatTimeLeft(leftMs);
   const isDone = item.status === "done";
 
   return (
-    <Card className={`border-2 transition-all relative overflow-hidden ${
+    <Card className={`border-2 transition-all relative overflow-hidden cursor-pointer ${
       isDone 
-        ? "border-emerald-300 shadow-md cursor-pointer hover:shadow-lg hover:border-emerald-400" 
-        : "border-gray-200 bg-white hover:shadow-md"
+        ? "border-emerald-300 shadow-md hover:shadow-lg hover:border-emerald-400" 
+        : "border-gray-200 bg-white hover:shadow-md hover:border-gray-300"
     }`}
-    onClick={isDone ? () => onRemove(item.id) : undefined}
+    onClick={() => onRemove(item.id)}
     >
-      {/* 进度条作为背景 */}
+      {/* 进度条作为背景 - 加深颜色 */}
       <div 
-        className={`absolute inset-0 transition-all duration-300 ${
-          isDone 
-            ? 'bg-emerald-50' 
-            : 'bg-gradient-to-r from-blue-50 to-transparent'
-        }`} 
+        className={`absolute inset-0 transition-all duration-300`} 
         style={{ 
           width: isDone ? '100%' : `${percent}%`,
           background: isDone 
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)'
-            : `linear-gradient(to right, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 70%, transparent 100%)`
+            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)'
+            : `linear-gradient(to right, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 70%, transparent 100%)`
         }} 
       />
       
-      <CardContent className="p-3 relative z-10">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="text-xl">{item.emoji}</div>
-          <div className="font-semibold truncate flex-1">{item.name}</div>
-          <div className="flex items-center gap-1">
-            <div className={`text-sm font-mono px-2 py-1 rounded-md ${
-              isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-white/80 text-gray-700 border'
-            }`}>
-              {leftText}
-            </div>
-            {isDone && <span className="text-emerald-600">🥢</span>}
-          </div>
-        </div>
-        
-        {!isDone && (
+      <CardContent className={`relative z-10 ${isDone ? 'p-2' : 'p-3'}`}>
+        {isDone ? (
+          // 完成状态：紧凑布局，只显示 emoji + 名称 + 筷子
           <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onPauseResume(item.id);
-              }} 
-              className="px-3 bg-white/80"
-              title={item.status === "paused" ? "继续" : "暂停"}
-            >
-              {item.status === "paused" ? <Play className="w-3 h-3 mr-1" /> : <Pause className="w-3 h-3 mr-1" />}
-              {item.status === "paused" ? "继续" : "暂停"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={(e) => {
-              e.stopPropagation();
-              onSnooze(item.id, 30);
-            }} className="text-xs px-2 bg-white/60 hover:bg-white/80">
-              +30s
-            </Button>
-            <Button size="sm" variant="ghost" onClick={(e) => {
-              e.stopPropagation();
-              onSnooze(item.id, 60);
-            }} className="text-xs px-2 bg-white/60 hover:bg-white/80">
-              +60s
-            </Button>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="ml-auto p-1 h-8 w-8 text-gray-400 hover:text-gray-600 bg-white/60 hover:bg-white/80" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(item.id);
-              }} 
-              title="移除"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <div className="text-lg">{item.emoji}</div>
+            <div className="font-medium truncate flex-1 text-sm">{item.name}</div>
+            <span className="text-emerald-600 text-lg">🥢</span>
+          </div>
+        ) : (
+          // 进行中状态：保持原有布局
+          <div className="flex items-center gap-3">
+            <div className="text-xl">{item.emoji}</div>
+            <div className="font-semibold truncate flex-1">{item.name}</div>
+            <div className="flex items-center gap-2">
+              {/* 圆形进度指示器 */}
+              <div className="relative w-8 h-8">
+                <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
+                  {/* 背景圆环 */}
+                  <circle
+                    cx="16"
+                    cy="16"
+                    r="12"
+                    stroke="rgb(229 231 235)"
+                    strokeWidth="2.5"
+                    fill="none"
+                  />
+                  {/* 进度圆环 */}
+                  <circle
+                    cx="16"
+                    cy="16"
+                    r="12"
+                    stroke="rgb(59 130 246)"
+                    strokeWidth="2.5"
+                    fill="none"
+                    strokeDasharray={`${2 * Math.PI * 12}`}
+                    strokeDashoffset={`${2 * Math.PI * 12 * (1 - percent / 100)}`}
+                    className="transition-all duration-300 ease-out"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <div className="text-sm font-mono px-2 py-1 rounded-md bg-white/90 text-gray-700 border border-gray-200">
+                {leftText}
+              </div>
+            </div>
           </div>
         )}
       </CardContent>
