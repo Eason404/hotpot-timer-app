@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Bell, BellRing, Check, Pause, Play, X, Timer, Clock, Settings, Volume2, VolumeX } from "lucide-react";
+import { Search, Bell, BellRing, Check, Pause, Play, X, Timer, Clock, Settings, Volume2, VolumeX, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -330,42 +330,124 @@ function BottomDock({
   onClearDone: () => void;
   percent: (t: TimerItem) => number;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const totalTimers = running.length + done.length;
+  
+  // Auto-collapse when no timers
+  useEffect(() => {
+    if (totalTimers === 0) {
+      setIsExpanded(false);
+    }
+  }, [totalTimers]);
+
+  const showExpandButton = running.length > 2 || (running.length > 0 && done.length > 0);
+
   return (
     <div className="fixed bottom-0 inset-x-0 z-40">
-      <div className="mx-auto max-w-screen-md m-3 p-3 rounded-2xl shadow-xl bg-white border">
-        {/* Running section */}
-        <div className="flex items-center gap-2 mb-2">
+      <motion.div 
+        className="mx-auto max-w-screen-md m-3 p-3 rounded-2xl shadow-xl bg-white border"
+        layout
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+      >
+        {/* Header with expand/collapse button */}
+        <div 
+          className={`flex items-center gap-2 mb-2 ${showExpandButton ? 'cursor-pointer' : ''}`}
+          onClick={() => showExpandButton && setIsExpanded(!isExpanded)}
+        >
           <Clock className="w-4 h-4" />
           <div className="font-medium">进行中</div>
           <div className="text-xs text-gray-500">{running.length} 个</div>
-        </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {running.length === 0 && <div className="text-sm text-gray-500">还没有计时，点上面的食材卡片开始吧～</div>}
-          {running.map((t) => (
-            <div key={t.id} className="shrink-0 w-[220px]">
-              <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={percent(t)} />
-            </div>
-          ))}
+          {done.length > 0 && (
+            <>
+              <div className="text-xs text-gray-300">•</div>
+              <div className="text-xs text-emerald-600">已完成 {done.length} 个</div>
+            </>
+          )}
+          {showExpandButton && (
+            <motion.div
+              className="ml-auto"
+              whileTap={{ scale: 0.95 }}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              )}
+            </motion.div>
+          )}
         </div>
 
-        {/* Done section */}
-        {done.length > 0 && (
-          <div className="mt-3">
+        {/* Running section */}
+        <motion.div
+          initial={false}
+          animate={{
+            height: isExpanded ? "auto" : running.length === 0 ? "auto" : "60px"
+          }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={`overflow-hidden ${running.length === 0 ? '' : isExpanded ? '' : 'overflow-hidden'}`}
+        >
+          {running.length === 0 ? (
+            <div className="text-sm text-gray-500">还没有计时，点上面的食材卡片开始吧～</div>
+          ) : isExpanded ? (
+            // Expanded view: Grid layout for mobile
+            <div className="grid grid-cols-1 gap-2">
+              {running.map((t) => (
+                <TimerChip key={t.id} item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={percent(t)} />
+              ))}
+            </div>
+          ) : (
+            // Collapsed view: Horizontal scroll
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {running.slice(0, 2).map((t) => (
+                <div key={t.id} className="shrink-0 w-[220px]">
+                  <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={percent(t)} />
+                </div>
+              ))}
+              {running.length > 2 && (
+                <div className="shrink-0 w-[100px] flex items-center justify-center text-sm text-gray-500">
+                  +{running.length - 2} 更多...
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Done section - only show when expanded or when there are no running timers */}
+        {done.length > 0 && (isExpanded || running.length === 0) && (
+          <motion.div 
+            className="mt-3"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
             <div className="flex items-center gap-2 mb-2 text-emerald-700">
               <Check className="w-4 h-4" />
               <div className="font-medium">已完成</div>
               <Button size="sm" variant="ghost" className="ml-auto" onClick={onClearDone}>清除全部</Button>
             </div>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {done.map((t) => (
-                <div key={t.id} className="shrink-0 w-[220px] opacity-90">
-                  <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={100} />
-                </div>
-              ))}
-            </div>
-          </div>
+            {isExpanded ? (
+              // Expanded view: Grid layout
+              <div className="grid grid-cols-1 gap-2">
+                {done.map((t) => (
+                  <div key={t.id} className="opacity-90">
+                    <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={100} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Collapsed view: Horizontal scroll
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {done.map((t) => (
+                  <div key={t.id} className="shrink-0 w-[220px] opacity-90">
+                    <TimerChip item={t} onPauseResume={onPauseResume} onRemove={onRemove} onSnooze={onSnooze} percent={100} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
