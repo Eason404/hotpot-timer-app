@@ -55,12 +55,13 @@ function formatTimeLeft(ms: number) {
 }
 
 function useTicking(enabled: boolean, intervalMs = 200) {
-  const [, setT] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!enabled) return;
-    const id = setInterval(() => setT((t) => t + 1), intervalMs);
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
     return () => clearInterval(id);
   }, [enabled, intervalMs]);
+  return tick;
 }
 
 // 单个计时条目
@@ -118,7 +119,7 @@ export default function HotpotTimerApp() {
   }, []);
 
   // 驱动重渲染
-  useTicking(true, 200);
+  const tick = useTicking(true, 200);
 
   // 过滤后的食材
   const filtered = useMemo(() => {
@@ -142,7 +143,7 @@ export default function HotpotTimerApp() {
     if (vibrateOn && navigator.vibrate) navigator.vibrate([180, 100, 180]);
     if (soundOn) playBeep(240, 1100, 0.25);
     fireNativeNotification("可以起锅啦！", "有食材到时间了～");
-  }, [timers, soundOn, vibrateOn]);
+  }, [tick, timers, soundOn, vibrateOn]);
 
   const running = timers.filter((t) => t.status !== "done");
   const done = timers.filter((t) => t.status === "done");
