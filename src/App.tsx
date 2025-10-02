@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { INGREDIENTS, CATEGORIES, RECOMMENDED_INGREDIENTS } from "@/data/ingredients";
 
 // ----------------------
@@ -77,6 +78,17 @@ export type TimerItem = {
   note?: string;
 };
 
+// 备菜清单项目
+export type PrepItem = {
+  id: string;
+  ingredientId: string;
+  name: string;
+  emoji: string;
+  seconds: number;
+  customSeconds?: number; // 用户自定义时间（覆盖默认时间）
+  addedAt: number;
+};
+
 function createTimerFromIngredient(ing: (typeof INGREDIENTS)[number], offsetSec = 0): TimerItem {
   const now = Date.now();
   const totalMs = (ing.seconds + offsetSec) * 1000;
@@ -107,10 +119,15 @@ export default function HotpotTimerApp() {
   const [timers, setTimers] = useState<TimerItem[]>(() => loadFromStorage<TimerItem[]>("hotpot_timers", []));
   const [soundOn, setSoundOn] = useState<boolean>(() => loadFromStorage("hotpot_sound", true));
   const [vibrateOn, setVibrateOn] = useState<boolean>(() => loadFromStorage("hotpot_vibrate", true));
+  
+  // Tab和备菜状态
+  const [activeTab, setActiveTab] = useState<"cook" | "prep">("cook");
+  const [prepList, setPrepList] = useState<PrepItem[]>(() => loadFromStorage<PrepItem[]>("hotpot_prep_list", []));
 
   useEffect(() => saveToStorage("hotpot_timers", timers), [timers]);
   useEffect(() => saveToStorage("hotpot_sound", soundOn), [soundOn]);
   useEffect(() => saveToStorage("hotpot_vibrate", vibrateOn), [vibrateOn]);
+  useEffect(() => saveToStorage("hotpot_prep_list", prepList), [prepList]);
 
   useEffect(() => {
     // 首次交互请求通知权限（非强制）
@@ -145,9 +162,6 @@ export default function HotpotTimerApp() {
     fireNativeNotification("可以起锅啦！", "有食材到时间了～");
   }, [tick, timers, soundOn, vibrateOn]);
 
-  const running = timers.filter((t) => t.status !== "done");
-  const done = timers.filter((t) => t.status === "done");
-
   function addTimer(ing: (typeof INGREDIENTS)[number]) {
     setTimers((prev) => [createTimerFromIngredient(ing), ...prev]);
   }
@@ -157,6 +171,46 @@ export default function HotpotTimerApp() {
   }
 
   function clearDone() { setTimers((p) => p.filter((t) => t.status !== "done")); }
+
+  // 备菜相关函数
+  function addToPrepList(ing: (typeof INGREDIENTS)[number]) {
+    // 检查是否已存在该食材
+    const exists = prepList.some(item => item.ingredientId === ing.id);
+    if (exists) return; // 如果已存在，不添加
+    
+    const newPrepItem: PrepItem = {
+      id: `prep_${ing.id}_${Date.now()}`,
+      ingredientId: ing.id,
+      name: ing.name,
+      emoji: ing.emoji || "🍽️",
+      seconds: ing.seconds,
+      addedAt: Date.now(),
+    };
+    setPrepList((prev) => [newPrepItem, ...prev]);
+  }
+
+  function removeFromPrepList(id: string) {
+    setPrepList((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function updatePrepTime(id: string, customSeconds: number) {
+    setPrepList((prev) => prev.map((p) => p.id === id ? { ...p, customSeconds } : p));
+  }
+
+  function clearPrepList() {
+    setPrepList([]);
+  }
+
+  function addFromPrepToTimer(prepItem: PrepItem) {
+    // 使用自定义时间或默认时间
+    const actualSeconds = prepItem.customSeconds || prepItem.seconds;
+    const ing = INGREDIENTS.find(ingredient => ingredient.id === prepItem.ingredientId);
+    if (ing) {
+      // 创建一个临时的ingredient对象，使用自定义时间
+      const customIng = { ...ing, seconds: actualSeconds };
+      addTimer(customIng);
+    }
+  }
 
   function percent(t: TimerItem) {
     const total = t.totalMs;
@@ -186,48 +240,112 @@ export default function HotpotTimerApp() {
         </div>
       </header>
 
-      {/* 搜索 & 分类 */}
-      <div className="mx-auto max-w-screen-md px-4 pt-4">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索食材（如：毛肚、虾滑）"
-              className="pl-9"
-            />
+      {/* Tab导航 */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "cook" | "prep")} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sticky top-[73px] z-20 mx-auto max-w-screen-md px-4 bg-white/70 backdrop-blur">
+          <TabsTrigger value="cook" className="flex items-center gap-2">
+            🔥 开煮
+          </TabsTrigger>
+          <TabsTrigger value="prep" className="flex items-center gap-2">
+            🛒 备菜
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 开煮Tab内容 */}
+        <TabsContent value="cook" className="mt-0">
+          <CookingTab 
+            timers={timers}
+            onRemoveTimer={removeTimer}
+            onClearDone={clearDone}
+            percent={percent}
+            prepList={prepList}
+            onAddFromPrepToTimer={addFromPrepToTimer}
+            onDirectAdd={addTimer}
+          />
+        </TabsContent>
+
+        {/* 备菜Tab内容 */}
+        <TabsContent value="prep" className="mt-0">
+          <PreparationTab
+            query={query}
+            setQuery={setQuery}
+            category={category}
+            setCategory={setCategory}
+            filtered={filtered}
+            prepList={prepList}
+            onAddToPrepList={addToPrepList}
+            onRemoveFromPrepList={removeFromPrepList}
+            onUpdatePrepTime={updatePrepTime}
+            onClearPrepList={clearPrepList}
+            onSwitchToCook={() => setActiveTab("cook")}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// 开煮Tab组件
+function CookingTab({
+  timers,
+  onRemoveTimer,
+  onClearDone,
+  percent,
+  prepList,
+  onAddFromPrepToTimer,
+  onDirectAdd,
+}: {
+  timers: TimerItem[];
+  onRemoveTimer: (id: string) => void;
+  onClearDone: () => void;
+  percent: (t: TimerItem) => number;
+  prepList: PrepItem[];
+  onAddFromPrepToTimer: (prepItem: PrepItem) => void;
+  onDirectAdd: (ing: (typeof INGREDIENTS)[number]) => void;
+}) {
+  const running = timers.filter((t) => t.status !== "done");
+  const done = timers.filter((t) => t.status === "done");
+
+  return (
+    <div className="mx-auto max-w-screen-md px-4 pt-4">
+      {/* 备菜清单快速添加 */}
+      {prepList.length > 0 && (
+        <div className="mb-6">
+          <div className="text-sm text-gray-500 mb-2">备菜清单</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {prepList.map((prepItem) => (
+              <Card key={prepItem.id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
+                onClick={() => onAddFromPrepToTimer(prepItem)}>
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{prepItem.emoji}</span>
+                    <div className="flex-1">
+                      <div className="font-medium leading-tight text-sm">{prepItem.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
+                          ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}分` 
+                          : `${prepItem.customSeconds || prepItem.seconds}s`}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                {/* Hover indicator */}
+                <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
+              </Card>
+            ))}
           </div>
         </div>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORIES.map((c) => (
-            <Button 
-              key={c} 
-              size="sm" 
-              variant={category === c ? "default" : "outline"} 
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                category === c 
-                  ? 'bg-primary text-primary-foreground shadow-md' 
-                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </Button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* 快捷食材（推荐）*/}
-      <div className="mx-auto max-w-screen-md px-4 mt-4">
+      <div className="mb-4">
         <div className="text-sm text-gray-500 mb-2">常用推荐</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {RECOMMENDED_INGREDIENTS.map((id) => {
             const ing = INGREDIENTS.find((x) => x.id === id)!;
             return (
               <Card key={id} className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer group" 
-                onClick={() => addTimer(ing)}>
+                onClick={() => onDirectAdd(ing)}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">{ing.emoji}</span>
@@ -247,18 +365,176 @@ export default function HotpotTimerApp() {
         </div>
       </div>
 
+      {/* 底部活动计时器栏 */}
+      <BottomDock
+        running={running}
+        done={done}
+        onRemove={onRemoveTimer}
+        onClearDone={onClearDone}
+        percent={percent}
+      />
+    </div>
+  );
+}
+
+// 备菜Tab组件
+function PreparationTab({
+  query,
+  setQuery,
+  category,
+  setCategory,
+  filtered,
+  prepList,
+  onAddToPrepList,
+  onRemoveFromPrepList,
+  onUpdatePrepTime,
+  onClearPrepList,
+  onSwitchToCook,
+}: {
+  query: string;
+  setQuery: (query: string) => void;
+  category: (typeof CATEGORIES)[number];
+  setCategory: (category: (typeof CATEGORIES)[number]) => void;
+  filtered: (typeof INGREDIENTS);
+  prepList: PrepItem[];
+  onAddToPrepList: (ing: (typeof INGREDIENTS)[number]) => void;
+  onRemoveFromPrepList: (id: string) => void;
+  onUpdatePrepTime: (id: string, customSeconds: number) => void;
+  onClearPrepList: () => void;
+  onSwitchToCook: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-screen-md px-4 pt-4">
+      {/* 搜索 & 分类 */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索食材（如：毛肚、虾滑）"
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {CATEGORIES.map((c) => (
+            <Button 
+              key={c} 
+              size="sm" 
+              variant={category === c ? "default" : "outline"} 
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                category === c 
+                  ? 'bg-primary text-primary-foreground shadow-md' 
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => setCategory(c)}
+            >
+              {c}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* 备菜清单 */}
+      {prepList.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold">备菜清单 ({prepList.length})</div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={onClearPrepList}>
+                清空
+              </Button>
+              <Button size="sm" onClick={onSwitchToCook}>
+                开始下锅
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            {prepList.map((prepItem) => (
+              <Card key={prepItem.id} className="border-blue-200 bg-blue-50/30">
+                <CardContent className="p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{prepItem.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{prepItem.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
+                          ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}分钟` 
+                          : `${prepItem.customSeconds || prepItem.seconds}秒`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          const currentTime = prepItem.customSeconds || prepItem.seconds;
+                          const newTime = Math.max(15, currentTime - 15); // 最少15秒
+                          onUpdatePrepTime(prepItem.id, newTime);
+                        }}
+                        className="w-7 h-7 p-0 text-xs"
+                        title="减少15秒"
+                      >
+                        -
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="w-7 h-7 p-0"
+                        title="设置时间"
+                      >
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          const currentTime = prepItem.customSeconds || prepItem.seconds;
+                          const newTime = currentTime + 15; // 增加15秒
+                          onUpdatePrepTime(prepItem.id, newTime);
+                        }}
+                        className="w-7 h-7 p-0 text-xs"
+                        title="增加15秒"
+                      >
+                        +
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => onRemoveFromPrepList(prepItem.id)}
+                        className="w-7 h-7 p-0 text-gray-400 hover:text-red-600"
+                        title="移除"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 所有食材网格 */}
-      <div className="mx-auto max-w-screen-md px-4 mt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {filtered.map((ing) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {filtered.map((ing) => {
+          const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
+          return (
             <motion.div key={ing.id} layout>
-              <Card className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group" 
-                onClick={() => addTimer(ing)}>
+              <Card className={`hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group ${
+                isInPrepList ? 'border-green-200 bg-green-50/30' : ''
+              }`} 
+                onClick={() => onAddToPrepList(ing)}>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center justify-between text-base">
                     <span className="flex items-center gap-2">
                       <span className="text-2xl">{ing.emoji}</span>
                       {ing.name}
+                      {isInPrepList && <span className="text-green-600 text-sm">✓</span>}
                     </span>
                     <Badge variant="secondary" className="text-xs">
                       {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
@@ -268,22 +544,13 @@ export default function HotpotTimerApp() {
                 <CardContent className="pt-0">
                   {ing.hint && <div className="text-xs text-gray-500 mb-3">{ing.hint}</div>}
                 </CardContent>
-                {/* Subtle hover indicator */}
-                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
+                {/* Hover indicator */}
+                <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
               </Card>
             </motion.div>
-          ))}
-        </div>
+          );
+        })}
       </div>
-
-      {/* 底部活动计时器栏 */}
-      <BottomDock
-        running={running}
-        done={done}
-        onRemove={removeTimer}
-        onClearDone={clearDone}
-        percent={percent}
-      />
     </div>
   );
 }
