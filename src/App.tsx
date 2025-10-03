@@ -545,28 +545,40 @@ function PreparationTab({
       <div className="mb-4">
         <div className="text-sm font-medium text-gray-600 mb-2">🔥 常用推荐</div>
         <div className="flex flex-wrap gap-2">
-          {RECOMMENDED_INGREDIENTS.map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
+          {RECOMMENDED_INGREDIENTS
+            .filter((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
+              const ing = INGREDIENTS.find((item) => item.id === id)!;
+              return !prepList.some(item => item.ingredientId === ing.id);
+            })
+            .map((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
             const ing = INGREDIENTS.find((item) => item.id === id)!;
-            const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
             return (
-              <motion.div key={ing.id} layout>
+              <motion.div 
+                key={ing.id} 
+                layout
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+              >
                 <Button
                   size="sm"
-                  variant={isInPrepList ? "default" : "outline"}
+                  variant="outline"
                   onClick={() => onAddToPrepList(ing)}
-                  className={`h-8 px-3 rounded-full text-xs transition-all ${
-                    isInPrepList 
-                      ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' 
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
-                  }`}
+                  className="h-8 px-3 rounded-full text-xs transition-all bg-white border-gray-200 hover:bg-gray-50"
                 >
                   <span className="text-sm mr-1">{ing.emoji}</span>
                   {ing.name}
-                  {isInPrepList && <span className="ml-1 text-green-600">✓</span>}
                 </Button>
               </motion.div>
             );
           })}
+          {RECOMMENDED_INGREDIENTS.filter((id: (typeof RECOMMENDED_INGREDIENTS)[number]) => {
+            const ing = INGREDIENTS.find((item) => item.id === id)!;
+            return !prepList.some(item => item.ingredientId === ing.id);
+          }).length === 0 && (
+            <div className="text-xs text-gray-400 py-2">常用推荐已全部选择 ✨</div>
+          )}
         </div>
       </div>
 
@@ -605,13 +617,19 @@ function PreparationTab({
 
       {/* 所有食材网格 - 紧凑版 */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
-        {filtered.map((ing: Ingredient) => {
-          const isInPrepList = prepList.some(item => item.ingredientId === ing.id);
+        {filtered
+          .filter((ing: Ingredient) => !prepList.some(item => item.ingredientId === ing.id))
+          .map((ing: Ingredient) => {
           return (
-            <motion.div key={ing.id} layout>
-              <Card className={`hover:shadow-md hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group ${
-                isInPrepList ? 'border-green-200 bg-green-50/50' : 'border-gray-100'
-              }`} 
+            <motion.div 
+              key={ing.id} 
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card className="hover:shadow-md hover:scale-[1.02] transition-all duration-200 cursor-pointer relative group border-gray-100" 
                 onClick={() => onAddToPrepList(ing)}>
                 <CardContent className="p-3">
                   <div className="text-center">
@@ -620,11 +638,6 @@ function PreparationTab({
                     <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                       {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}m` : `${ing.seconds}s`}
                     </Badge>
-                    {isInPrepList && (
-                      <div className="absolute top-1 right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
                 {/* Hover indicator */}
@@ -633,6 +646,12 @@ function PreparationTab({
             </motion.div>
           );
         })}
+        {filtered.filter((ing: Ingredient) => !prepList.some(item => item.ingredientId === ing.id)).length === 0 && (
+          <div className="col-span-full text-center py-8 text-gray-400">
+            <div className="text-4xl mb-2">🎉</div>
+            <div className="text-sm">该分类下的食材已全部选择</div>
+          </div>
+        )}
       </div>
     </div>
   );
