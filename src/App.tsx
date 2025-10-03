@@ -478,65 +478,97 @@ function PreparationTab({
       {prepList.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-lg font-semibold">� 我的备菜 ({prepList.length})</div>
+            <div className="text-lg font-semibold">🛒 我的备菜 ({prepList.length})</div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={onClearPrepList}>
                 清空
               </Button>
-              <Button size="sm" onClick={onSwitchToCook}>
-                开始下锅
+              <Button size="sm" onClick={onSwitchToCook} className="bg-orange-500 hover:bg-orange-600 text-white">
+                开始下锅 🔥
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {prepList.map((prepItem) => (
-              <div key={prepItem.id} className="flex items-center gap-1.5 bg-orange-50/80 border border-orange-200 rounded-full px-4 py-2 text-xs">
-                <span className="text-sm">{prepItem.emoji}</span>
-                <span className="font-medium">{prepItem.name}</span>
-                <span className="text-gray-500">
-                  {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
-                    ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}m` 
-                    : `${prepItem.customSeconds || prepItem.seconds}s`}
-                </span>
-                <div className="flex items-center gap-1 ml-1">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => {
-                      const currentTime = prepItem.customSeconds || prepItem.seconds;
-                      const newTime = Math.max(15, currentTime - 15);
-                      onUpdatePrepTime(prepItem.id, newTime);
-                    }}
-                    className="w-5 h-5 p-0 text-xs hover:bg-orange-100 rounded-full"
-                    title="减少15秒"
-                  >
-                    -
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => {
-                      const currentTime = prepItem.customSeconds || prepItem.seconds;
-                      const newTime = currentTime + 15;
-                      onUpdatePrepTime(prepItem.id, newTime);
-                    }}
-                    className="w-5 h-5 p-0 text-xs hover:bg-orange-100 rounded-full"
-                    title="增加15秒"
-                  >
-                    +
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={() => onRemoveFromPrepList(prepItem.id)}
-                    className="w-5 h-5 p-0 text-xs text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full ml-0.5"
-                    title="移除"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+            {prepList.map((prepItem) => {
+              const currentTime = prepItem.customSeconds || prepItem.seconds;
+              const displayTime = currentTime >= 60 
+                ? `${Math.round(currentTime / 60)}分` 
+                : `${currentTime}s`;
+              
+              return (
+                <motion.div 
+                  key={prepItem.id} 
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card className="border-orange-200 bg-orange-50/50 hover:shadow-md hover:scale-[1.02] transition-all duration-200 relative group">
+                    <CardContent className="p-3">
+                      <div className="text-center">
+                        <div className="text-xl mb-1">{prepItem.emoji}</div>
+                        <div className="text-xs font-medium truncate mb-1">{prepItem.name}</div>
+                        
+                        {/* 时间调整区域 */}
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newTime = Math.max(15, currentTime - 15);
+                              onUpdatePrepTime(prepItem.id, newTime);
+                            }}
+                            className="w-4 h-4 p-0 text-xs hover:bg-red-100 hover:text-red-600 rounded-full"
+                            title="减少15秒"
+                          >
+                            −
+                          </Button>
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 border-orange-200">
+                            {displayTime}
+                          </Badge>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newTime = currentTime + 15;
+                              onUpdatePrepTime(prepItem.id, newTime);
+                            }}
+                            className="w-4 h-4 p-0 text-xs hover:bg-green-100 hover:text-green-600 rounded-full"
+                            title="增加15秒"
+                          >
+                            +
+                          </Button>
+                        </div>
+                        
+                        {/* 原始时间参考 */}
+                        <div className="text-[10px] text-gray-400">
+                          建议 {Math.round(prepItem.seconds / 60) > 0 ? `${Math.round(prepItem.seconds / 60)}分` : `${prepItem.seconds}s`}
+                        </div>
+                        
+                        {/* 删除按钮 */}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemoveFromPrepList(prepItem.id);
+                          }}
+                          className="absolute top-1 right-1 w-4 h-4 p-0 text-xs text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="移除"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    </CardContent>
+                    {/* Hover indicator */}
+                    <div className="absolute inset-0 bg-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg pointer-events-none" />
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       )}
