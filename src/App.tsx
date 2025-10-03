@@ -864,13 +864,7 @@ function BottomDock({
           <div className={`px-3 pb-3 ${isExpanded ? 'overflow-y-auto max-h-[calc(65vh-100px)]' : ''}`}>
             {/* Done section - 出锅啦的食物显示在最上面 */}
             {done.length > 0 && (
-              <motion.div 
-                className="mb-3"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
+              <div className="mb-3">
                 <div className="flex items-center gap-2 mb-2 text-emerald-700">
                   <Check className="w-4 h-4" />
                   <div className="font-medium">出锅啦</div>
@@ -878,13 +872,18 @@ function BottomDock({
                 </div>
                 {isExpanded ? (
                   // Expanded view: 完成的食材使用更紧凑的三列布局
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="grid grid-cols-3 sm:grid-cols-4 gap-2"
+                  >
                     {done.map((t) => (
                       <div key={t.id} className="opacity-90">
                         <TimerChip item={t} onRemove={onRemove} percent={100} />
                       </div>
                     ))}
-                  </div>
+                  </motion.div>
                 ) : (
                   // Collapsed view: Horizontal scroll
                   <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -895,18 +894,11 @@ function BottomDock({
                     ))}
                   </div>
                 )}
-              </motion.div>
+              </div>
             )}
 
             {/* Running section - 在锅里的食物显示在下面，按剩余时间排序 */}
-            <motion.div
-              initial={false}
-              animate={{
-                height: isExpanded ? "auto" : running.length === 0 ? "auto" : "60px"
-              }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className={`overflow-hidden ${running.length === 0 ? '' : isExpanded ? '' : 'overflow-hidden'}`}
-            >
+            <div className="overflow-hidden">
               {running.length === 0 ? (
                 totalTimers === 0 ? (
                   <div className="text-sm text-gray-500">锅里空空的，点上面的食材卡片开始煮吧～</div>
@@ -915,7 +907,12 @@ function BottomDock({
                 )
               ) : isExpanded ? (
                 // Expanded view: 响应式网格布局，快完成的排在前面
-                <div className="space-y-2">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="space-y-2"
+                >
                   {/* 快完成提醒 */}
                   {sortedRunning.filter(t => Math.max(0, t.endAt - Date.now()) <= 30000).length > 0 && (
                     <div className="text-xs text-orange-600 font-medium mb-2">
@@ -933,10 +930,16 @@ function BottomDock({
                       );
                     })}
                   </div>
-                </div>
+                </motion.div>
               ) : (
                 // Collapsed view: Horizontal scroll，显示最紧急的
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="flex gap-2 overflow-x-auto no-scrollbar pb-1"
+                  style={{ height: '60px' }}
+                >
                   {sortedRunning.slice(0, 2).map((t) => (
                     <div key={t.id} className="shrink-0 w-[220px]">
                       <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
@@ -947,9 +950,9 @@ function BottomDock({
                       +{running.length - 2} 还在煮...
                     </div>
                   )}
-                </div>
+                </motion.div>
               )}
-            </motion.div>
+            </div>
             
             {/* 底部渐变遮罩提示 - 只在展开且内容可滚动时显示 */}
             {isExpanded && (running.length + done.length) > 6 && (
