@@ -770,7 +770,11 @@ function BottomDock({
               className={`overflow-hidden ${running.length === 0 ? '' : isExpanded ? '' : 'overflow-hidden'}`}
             >
               {running.length === 0 ? (
-                <div className="text-sm text-gray-500">锅里空空的，点上面的食材卡片开始煮吧～</div>
+                totalTimers === 0 ? (
+                  <div className="text-sm text-gray-500">锅里空空的，点上面的食材卡片开始煮吧～</div>
+                ) : (
+                  <div className="text-sm text-gray-500">正在煮的食材都出锅啦～继续添加新的吧</div>
+                )
               ) : isExpanded ? (
                 // Expanded view: 响应式网格布局
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
