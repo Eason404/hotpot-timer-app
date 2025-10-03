@@ -986,21 +986,17 @@ function TimerChip({
     }`}
     onClick={() => onRemove(item.id)}
     >
-      {/* 进度条作为背景 - 使用温暖橙色系 */}
-      <div 
-        className={`absolute inset-0 transition-all duration-300`} 
-        style={{ 
-          width: isDone ? '100%' : `${percent}%`,
-          background: isDone 
-            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.12) 100%)'
-            : `linear-gradient(to right, 
-                rgba(251, 146, 60, 0.25) 0%, 
-                rgba(249, 115, 22, 0.18) 25%,
-                rgba(234, 88, 12, 0.15) 50%,
-                rgba(194, 65, 12, 0.08) 75%,
-                transparent 100%)`
-        }} 
-      />
+      {/* 铺满整个card的进度条背景 - 更深的颜色 */}
+      {!isDone && (
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500 ease-out"
+          style={{ 
+            width: `${percent}%`,
+            opacity: 0.25,
+            boxShadow: 'inset 0 0 20px rgba(249, 115, 22, 0.15)'
+          }} 
+        />
+      )}
       
       <CardContent className={`relative z-10 ${isDone ? 'p-2' : 'p-3'}`}>
         {isDone ? (
@@ -1011,41 +1007,12 @@ function TimerChip({
             <span className="text-emerald-600 text-lg">🥢</span>
           </div>
         ) : (
-          // 进行中状态：保持原有布局
+          // 进行中状态：简洁布局 + 铺满的进度条背景
           <div className="flex items-center gap-3">
             <div className="text-xl">{item.emoji}</div>
             <div className="font-semibold truncate flex-1">{item.name}</div>
-            <div className="flex items-center gap-2">
-              {/* 圆形进度指示器 */}
-              <div className="relative w-8 h-8">
-                <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
-                  {/* 背景圆环 */}
-                  <circle
-                    cx="16"
-                    cy="16"
-                    r="12"
-                    stroke="rgb(229 231 235)"
-                    strokeWidth="2.5"
-                    fill="none"
-                  />
-                  {/* 进度圆环 - 使用温暖橙色 */}
-                  <circle
-                    cx="16"
-                    cy="16"
-                    r="12"
-                    stroke="rgb(249, 115, 22)"
-                    strokeWidth="2.5"
-                    fill="none"
-                    strokeDasharray={`${2 * Math.PI * 12}`}
-                    strokeDashoffset={`${2 * Math.PI * 12 * (1 - percent / 100)}`}
-                    className="transition-all duration-300 ease-out"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-              <div className="text-sm font-mono px-2 py-1 rounded-md bg-white/90 text-gray-700 border border-gray-200">
-                {leftText}
-              </div>
+            <div className="text-sm font-mono px-2 py-1 rounded-md bg-white/95 text-gray-700 border border-gray-200 shadow-sm">
+              {leftText}
             </div>
           </div>
         )}
