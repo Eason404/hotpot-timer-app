@@ -767,6 +767,13 @@ function BottomDock({
   const [isMinimized, setIsMinimized] = useState(false);
   const totalTimers = running.length + done.length;
   
+  // 智能排序：快完成的排在前面
+  const sortedRunning = [...running].sort((a, b) => {
+    const timeLeftA = Math.max(0, a.endAt - Date.now());
+    const timeLeftB = Math.max(0, b.endAt - Date.now());
+    return timeLeftA - timeLeftB; // 剩余时间最少的排在前面
+  });
+  
   // Auto-collapse when no timers
   useEffect(() => {
     if (totalTimers === 0) {
@@ -783,12 +790,21 @@ function BottomDock({
   return (
     <div className="fixed bottom-0 inset-x-0 z-40">
       <motion.div 
-        className="mx-auto max-w-screen-md m-3 p-3 rounded-2xl shadow-xl bg-white border"
+        className={`mx-auto max-w-screen-md m-3 rounded-2xl shadow-xl bg-white border transition-all duration-300 ${
+          isExpanded ? 'max-h-[65vh]' : ''
+        }`}
         layout
         transition={{ duration: 0.3, ease: "easeInOut" }}
       >
+        {/* 拖拽指示条 - 只在展开时显示 */}
+        {isExpanded && (
+          <div className="flex justify-center pt-2 pb-1">
+            <div className="w-8 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+        )}
+
         {/* Header with expand/collapse and minimize buttons */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 px-3 pt-3">
           <div 
             className={`flex items-center gap-2 flex-1 ${showExpandButton && !isMinimized ? 'cursor-pointer' : ''}`}
             onClick={() => showExpandButton && !isMinimized && setIsExpanded(!isExpanded)}
@@ -806,6 +822,16 @@ function BottomDock({
           
           {/* Action buttons */}
           <div className="flex items-center gap-1">
+            {isExpanded && (
+              <motion.button
+                className="p-1 hover:bg-gray-100 rounded-md transition-colors text-xs text-gray-500"
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsExpanded(false)}
+              >
+                收起
+              </motion.button>
+            )}
+            
             {showExpandButton && !isMinimized && (
               <motion.button
                 className="p-1 hover:bg-gray-100 rounded-md transition-colors"
@@ -835,7 +861,7 @@ function BottomDock({
 
         {/* Content - hide when minimized */}
         {!isMinimized && (
-          <>
+          <div className={`px-3 pb-3 ${isExpanded ? 'overflow-y-auto max-h-[calc(65vh-100px)]' : ''}`}>
             {/* Done section - 出锅啦的食物显示在最上面 */}
             {done.length > 0 && (
               <motion.div 
@@ -872,7 +898,7 @@ function BottomDock({
               </motion.div>
             )}
 
-            {/* Running section - 在锅里的食物显示在下面 */}
+            {/* Running section - 在锅里的食物显示在下面，按剩余时间排序 */}
             <motion.div
               initial={false}
               animate={{
@@ -888,18 +914,30 @@ function BottomDock({
                   <div className="text-sm text-gray-500">正在煮的食材都出锅啦～继续添加新的吧</div>
                 )
               ) : isExpanded ? (
-                // Expanded view: 响应式网格布局
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {running.map((t) => (
-                    <div key={t.id}>
-                      <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
+                // Expanded view: 响应式网格布局，快完成的排在前面
+                <div className="space-y-2">
+                  {/* 快完成提醒 */}
+                  {sortedRunning.filter(t => Math.max(0, t.endAt - Date.now()) <= 30000).length > 0 && (
+                    <div className="text-xs text-orange-600 font-medium mb-2">
+                      ⚡ 快完成的食材（30秒内）
                     </div>
-                  ))}
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {sortedRunning.map((t) => {
+                      const timeLeft = Math.max(0, t.endAt - Date.now());
+                      const isUrgent = timeLeft <= 30000 && timeLeft > 0;
+                      return (
+                        <div key={t.id} className={isUrgent ? 'ring-2 ring-orange-300 rounded-lg' : ''}>
+                          <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                // Collapsed view: Horizontal scroll
+                // Collapsed view: Horizontal scroll，显示最紧急的
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                  {running.slice(0, 2).map((t) => (
+                  {sortedRunning.slice(0, 2).map((t) => (
                     <div key={t.id} className="shrink-0 w-[220px]">
                       <TimerChip item={t} onRemove={onRemove} percent={percent(t)} />
                     </div>
@@ -912,7 +950,12 @@ function BottomDock({
                 </div>
               )}
             </motion.div>
-          </>
+            
+            {/* 底部渐变遮罩提示 - 只在展开且内容可滚动时显示 */}
+            {isExpanded && (running.length + done.length) > 6 && (
+              <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white to-transparent pointer-events-none rounded-b-2xl"></div>
+            )}
+          </div>
         )}
       </motion.div>
     </div>
