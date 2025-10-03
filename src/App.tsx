@@ -27,106 +27,103 @@ import type { PrepItem, TimerItem } from "@/types";
 // 使用：把此组件放入任意 React（Vite/Next）项目；项目需启用 Tailwind 与 shadcn/ui。
 // ----------------------
 
-// 播放完成提示音 - 更悦耳的"叮咚"声
-function playCompleteSound() {
+// 全局音频上下文
+let globalAudioContext: AudioContext | null = null;
+let audioInitialized = false;
+
+// 初始化音频上下文 - 必须在用户交互时调用
+function initializeAudio() {
+  if (audioInitialized) return;
+  
   try {
-    // 检查浏览器是否支持 Web Audio API
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     
-    const ctx = new AudioContextClass();
+    globalAudioContext = new AudioContextClass();
+    
+    // 在iOS上，需要播放一个静音音频来激活
+    const buffer = globalAudioContext.createBuffer(1, 1, 22050);
+    const source = globalAudioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(globalAudioContext.destination);
+    source.start();
+    
+    audioInitialized = true;
+    console.log('🔊 音频系统已初始化');
+  } catch (error) {
+    console.warn('音频初始化失败:', error);
+  }
+}
+
+// 播放完成提示音 - 更悦耳的"叮咚"声
+function playCompleteSound() {
+  try {
+    if (!globalAudioContext || !audioInitialized) {
+      console.warn('🔇 音频未初始化，无法播放');
+      return;
+    }
     
     // 确保 AudioContext 处于运行状态
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    if (globalAudioContext.state === 'suspended') {
+      globalAudioContext.resume();
     }
     
     // 第一个音符 (高音)
-    const o1 = ctx.createOscillator();
-    const g1 = ctx.createGain();
+    const o1 = globalAudioContext.createOscillator();
+    const g1 = globalAudioContext.createGain();
     o1.type = "sine";
-    o1.frequency.setValueAtTime(800, ctx.currentTime);
-    g1.gain.setValueAtTime(0.4, ctx.currentTime);
-    g1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    o1.frequency.setValueAtTime(800, globalAudioContext.currentTime);
+    g1.gain.setValueAtTime(0.4, globalAudioContext.currentTime);
+    g1.gain.exponentialRampToValueAtTime(0.01, globalAudioContext.currentTime + 0.3);
     o1.connect(g1);
-    g1.connect(ctx.destination);
+    g1.connect(globalAudioContext.destination);
     o1.start();
-    o1.stop(ctx.currentTime + 0.3);
+    o1.stop(globalAudioContext.currentTime + 0.3);
     
     // 第二个音符 (低音) - 延迟0.1秒
     setTimeout(() => {
-      const o2 = ctx.createOscillator();
-      const g2 = ctx.createGain();
+      if (!globalAudioContext) return;
+      const o2 = globalAudioContext.createOscillator();
+      const g2 = globalAudioContext.createGain();
       o2.type = "sine";
-      o2.frequency.setValueAtTime(600, ctx.currentTime);
-      g2.gain.setValueAtTime(0.3, ctx.currentTime);
-      g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      o2.frequency.setValueAtTime(600, globalAudioContext.currentTime);
+      g2.gain.setValueAtTime(0.3, globalAudioContext.currentTime);
+      g2.gain.exponentialRampToValueAtTime(0.01, globalAudioContext.currentTime + 0.4);
       o2.connect(g2);
-      g2.connect(ctx.destination);
+      g2.connect(globalAudioContext.destination);
       o2.start();
-      o2.stop(ctx.currentTime + 0.4);
-      
-      // 清理
-      setTimeout(() => {
-        try {
-          ctx.close();
-        } catch (e) {
-          // 忽略关闭错误
-        }
-      }, 500);
+      o2.stop(globalAudioContext.currentTime + 0.4);
     }, 100);
   } catch (error) {
-    // 回退到简单的 beep 声
-    try {
-      const ctx = new ((window as any).webkitAudioContext || window.AudioContext)();
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = 800;
-      g.gain.value = 0.3;
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.start();
-      setTimeout(() => {
-        o.stop();
-        ctx.close();
-      }, 200);
-    } catch (fallbackError) {
-      // 静默失败
-    }
+    console.warn('播放音频失败:', error);
   }
 }
 
 // 播放点击反馈音 - 轻快的点击声
 function playClickSound() {
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    
-    const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    if (!globalAudioContext || !audioInitialized) {
+      // 如果音频未初始化，尝试初始化
+      initializeAudio();
+      return;
     }
     
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.setValueAtTime(400, ctx.currentTime);
-    g.gain.setValueAtTime(0.2, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    o.stop(ctx.currentTime + 0.1);
+    if (globalAudioContext.state === 'suspended') {
+      globalAudioContext.resume();
+    }
     
-    setTimeout(() => {
-      try {
-        ctx.close();
-      } catch (e) {
-        // 忽略关闭错误
-      }
-    }, 150);
+    const o = globalAudioContext.createOscillator();
+    const g = globalAudioContext.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(400, globalAudioContext.currentTime);
+    g.gain.setValueAtTime(0.2, globalAudioContext.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, globalAudioContext.currentTime + 0.1);
+    o.connect(g);
+    g.connect(globalAudioContext.destination);
+    o.start();
+    o.stop(globalAudioContext.currentTime + 0.1);
   } catch (error) {
-    // 静默失败
+    console.warn('播放点击音失败:', error);
   }
 }
 
@@ -254,6 +251,11 @@ export default function HotpotTimerApp() {
 
   // 备菜相关函数
   function addToPrepList(ing: (typeof INGREDIENTS)[number]) {
+    // 初始化音频（仅在首次用户交互时）
+    if (!audioInitialized) {
+      initializeAudio();
+    }
+    
     if (soundOn) playClickSound();
     if (vibrateOn) triggerHapticFeedback('light');
     setPrepList((prev) => addIngredientToPrepList(prev, ing));
@@ -261,6 +263,11 @@ export default function HotpotTimerApp() {
 
   // 添加自定义食材到备菜清单
   function addCustomToPrepList(name: string, emoji: string, seconds: number) {
+    // 初始化音频（仅在首次用户交互时）
+    if (!audioInitialized) {
+      initializeAudio();
+    }
+    
     if (soundOn) playClickSound();
     if (vibrateOn) triggerHapticFeedback('light');
     
@@ -290,6 +297,11 @@ export default function HotpotTimerApp() {
   }
 
   function addFromPrepToTimer(prepItem: PrepItem) {
+    // 初始化音频（仅在首次用户交互时）
+    if (!audioInitialized) {
+      initializeAudio();
+    }
+    
     if (soundOn) playClickSound();
     if (vibrateOn) triggerHapticFeedback('medium');
     setTimers((prev) => addTimerFromPrepItem(prev, prepItem, ingredientLookup));
@@ -306,8 +318,22 @@ export default function HotpotTimerApp() {
           <h1 className="text-xl font-semibold tracking-tight">火锅计时器</h1>
           <Badge className="ml-1" variant="secondary">Card View</Badge>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setSoundOn((s) => !s)} title={soundOn ? "关闭提示音" : "开启提示音"}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => {
+                if (!audioInitialized) {
+                  initializeAudio();
+                }
+                setSoundOn((s) => !s);
+              }} 
+              title={soundOn ? "关闭提示音" : "开启提示音"}
+              className={!audioInitialized && soundOn ? "text-orange-500" : ""}
+            >
               {soundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {!audioInitialized && soundOn && (
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setVibrateOn((v) => !v)} title={vibrateOn ? "关闭震动" : "开启震动"}>
               {vibrateOn ? <BellRing className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
