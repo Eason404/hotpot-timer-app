@@ -103,8 +103,25 @@ export function addTimerFromPrepItem(
   ingredientLookup: Map<string, Ingredient>,
   now: number = Date.now(),
 ): TimerItem[] {
+  // 处理自定义食材
+  if (prepItem.isCustom) {
+    const customSeconds = prepItem.customSeconds ?? prepItem.seconds;
+    const timer: TimerItem = {
+      id: `custom_${now}_${Math.random().toString(36).substr(2, 9)}`,
+      name: prepItem.name,
+      emoji: prepItem.emoji,
+      totalMs: customSeconds * 1000,
+      startAt: now,
+      endAt: now + (customSeconds * 1000),
+      status: "running",
+    };
+    return [timer, ...timers];
+  }
+  
+  // 处理普通食材
   const ingredient = ingredientLookup.get(prepItem.ingredientId);
   if (!ingredient) return timers;
+  
   const customSeconds = prepItem.customSeconds ?? prepItem.seconds;
   const timer = createTimerFromIngredient({ ...ingredient, seconds: customSeconds }, 0, now);
   return [timer, ...timers];

@@ -20,4 +20,5 @@ export interface PrepItem {
   seconds: number;
   customSeconds?: number;
   addedAt: number;
+  isCustom?: boolean; // 标识是否为自定义食材
 }

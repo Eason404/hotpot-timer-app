@@ -259,6 +259,24 @@ export default function HotpotTimerApp() {
     setPrepList((prev) => addIngredientToPrepList(prev, ing));
   }
 
+  // 添加自定义食材到备菜清单
+  function addCustomToPrepList(name: string, emoji: string, seconds: number) {
+    if (soundOn) playClickSound();
+    if (vibrateOn) triggerHapticFeedback('light');
+    
+    const customPrepItem: PrepItem = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      ingredientId: `custom_${Date.now()}`, // 自定义食材的虚拟ID
+      name,
+      emoji,
+      seconds,
+      addedAt: Date.now(),
+      isCustom: true
+    };
+    
+    setPrepList((prev) => [...prev, customPrepItem]);
+  }
+
   function removeFromPrepList(id: string) {
     setPrepList((prev) => removePrepItem(prev, id));
   }
@@ -339,6 +357,7 @@ export default function HotpotTimerApp() {
             filtered={filtered}
             prepList={prepList}
             onAddToPrepList={addToPrepList}
+            onAddCustomToPrepList={addCustomToPrepList}
             onRemoveFromPrepList={removeFromPrepList}
             onUpdatePrepTime={updatePrepTime}
             onClearPrepList={clearPrepList}
@@ -455,7 +474,7 @@ function PrepItemCard({
               
               {/* 原始时间参考 */}
               <div className="text-[10px] text-orange-600 mb-2">
-                建议 {Math.round(prepItem.seconds / 60) > 0 ? `${Math.round(prepItem.seconds / 60)}分` : `${prepItem.seconds}s`}
+                建议 {prepItem.seconds >= 60 ? `${Math.round(prepItem.seconds / 60)}分` : `${prepItem.seconds}s`}
               </div>
               
               {/* 完成按钮 */}
@@ -526,9 +545,12 @@ function CookingTab({
                     <div className="flex-1">
                       <div className="font-medium leading-tight text-sm">{prepItem.name}</div>
                       <div className="text-xs text-gray-500">
-                        {Math.round((prepItem.customSeconds || prepItem.seconds) / 60) > 0 
-                          ? `${Math.round((prepItem.customSeconds || prepItem.seconds) / 60)}分` 
-                          : `${prepItem.customSeconds || prepItem.seconds}s`}
+                        {(() => {
+                          const currentTime = prepItem.customSeconds || prepItem.seconds;
+                          return currentTime >= 60 
+                            ? `${Math.round(currentTime / 60)}分` 
+                            : `${currentTime}s`;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -580,6 +602,7 @@ function PreparationTab({
   filtered,
   prepList,
   onAddToPrepList,
+  onAddCustomToPrepList,
   onRemoveFromPrepList,
   onUpdatePrepTime,
   onClearPrepList,
@@ -592,13 +615,118 @@ function PreparationTab({
   filtered: (typeof INGREDIENTS);
   prepList: PrepItem[];
   onAddToPrepList: (ing: (typeof INGREDIENTS)[number]) => void;
+  onAddCustomToPrepList: (name: string, emoji: string, seconds: number) => void;
   onRemoveFromPrepList: (id: string) => void;
   onUpdatePrepTime: (id: string, customSeconds: number) => void;
   onClearPrepList: () => void;
   onSwitchToCook: () => void;
 }) {
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customEmoji, setCustomEmoji] = useState("🥘");
+  const [customTime, setCustomTime] = useState(30);
+
+  const handleAddCustom = () => {
+    if (customName.trim()) {
+      onAddCustomToPrepList(customName.trim(), customEmoji, customTime);
+      setCustomName("");
+      setCustomEmoji("🥘");
+      setCustomTime(30);
+      setShowCustomForm(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-screen-md px-4 pt-4">
+      {/* 自定义食材添加区域 */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium text-gray-600">➕ 自定义食材</div>
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => setShowCustomForm(!showCustomForm)}
+            className="text-xs"
+          >
+            {showCustomForm ? "取消" : "添加自定义"}
+          </Button>
+        </div>
+        
+        {showCustomForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">食材名称</label>
+                <Input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="如：手打丸子"
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">图标</label>
+                <div className="flex gap-1">
+                  {["🥘", "🍖", "🥬", "🍄", "🧄", "🌶️"].map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => setCustomEmoji(emoji)}
+                      className={`w-8 h-8 text-lg rounded border-2 transition-colors ${
+                        customEmoji === emoji ? 'border-orange-400 bg-orange-50' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">时间(秒)</label>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setCustomTime(Math.max(5, customTime - 15))}
+                    className="w-8 h-8 p-0"
+                  >
+                    -
+                  </Button>
+                  <Input
+                    type="number"
+                    value={customTime}
+                    onChange={(e) => setCustomTime(Math.max(5, parseInt(e.target.value) || 30))}
+                    className="text-center text-sm w-16"
+                  />
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setCustomTime(customTime + 15)}
+                    className="w-8 h-8 p-0"
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button 
+                size="sm" 
+                onClick={handleAddCustom}
+                disabled={!customName.trim()}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                添加到备菜
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </div>
       {/* 备菜清单 - 置顶显示，最重要 */}
       {prepList.length > 0 && (
         <div className="mb-6">
@@ -729,7 +857,7 @@ function PreparationTab({
                     <div className="text-xl mb-1">{ing.emoji}</div>
                     <div className="text-xs font-medium truncate mb-1">{ing.name}</div>
                     <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                      {Math.round(ing.seconds / 60) > 0 ? `${Math.round(ing.seconds / 60)}m` : `${ing.seconds}s`}
+                      {ing.seconds >= 60 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
                     </Badge>
                   </div>
                 </CardContent>
