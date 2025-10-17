@@ -2,7 +2,7 @@
 export interface Ingredient {
   id: string;
   name: string;
-  emoji: string;
+  emoji?: string;
   seconds: number;
   category: string;
   hint?: string;
@@ -17,6 +17,7 @@ export const INGREDIENTS: Ingredient[] = [
   { id: "tripe", name: "毛肚", emoji: "🐄", seconds: 15, category: "内脏/爽脆", hint: "七上八下 ~15s" },
   { id: "duck_intestine", name: "鸭肠", emoji: "🦆", seconds: 12, category: "内脏/爽脆", hint: "抖松涮至变色即起" },
   { id: "artery", name: "黄喉", emoji: "✨", seconds: 60, category: "内脏/爽脆", hint: "60-90s 区间，依喜好调节" },
+  { id: "duck_blood", name: "鸭血", emoji: "🩸", seconds: 480, category: "内脏/爽脆", hint: "保持微沸煮 8 分钟入味" },
 
   // —— 丸滑/加工 ——
   { id: "shrimp_paste", name: "虾滑", emoji: "🍤", seconds: 120, category: "丸滑/加工", hint: "定型浮起 + 1-2 分钟" },
@@ -46,6 +47,7 @@ export const INGREDIENTS: Ingredient[] = [
   { id: "cilantro", name: "香菜", emoji: "🌿", seconds: 5, category: "蔬菜菌菇", hint: "点缀即可，不需久煮" }, // ➕ 新增
   { id: "celery", name: "芹菜", emoji: "🥬", seconds: 40, category: "蔬菜菌菇", hint: "切段，保持脆口" }, // ➕ 新增
   { id: "asparagus_lettuce", name: "莴笋片", emoji: "🥗", seconds: 60, category: "蔬菜菌菇" }, // ➕ 新增
+  { id: "black_fungus", name: "木耳", emoji: "🍄", seconds: 300, category: "蔬菜菌菇", hint: "焯煮 5 分钟保留脆感" },
   { id: "kelp_knot", name: "海带结", emoji: "🔗", seconds: 240, category: "蔬菜菌菇" },
   { id: "baby_kelp", name: "海带苗", emoji: "🪴", seconds: 8, category: "蔬菜菌菇", hint: "8-12s 脆口最佳" },
   { id: "baby_corn", name: "玉米笋", emoji: "🌽", seconds: 120, category: "蔬菜菌菇" },
