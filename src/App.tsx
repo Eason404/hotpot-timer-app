@@ -36,7 +36,8 @@ function initializeAudio() {
   if (audioInitialized) return;
   
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
     
     globalAudioContext = new AudioContextClass();
@@ -49,9 +50,9 @@ function initializeAudio() {
     source.start();
     
     audioInitialized = true;
-    console.log('🔊 音频系统已初始化');
-  } catch (error) {
-    console.warn('音频初始化失败:', error);
+    console.log("🔊 音频系统已初始化");
+  } catch (error: unknown) {
+    console.warn("音频初始化失败:", error);
   }
 }
 
@@ -94,8 +95,8 @@ function playCompleteSound() {
       o2.start();
       o2.stop(globalAudioContext.currentTime + 0.4);
     }, 100);
-  } catch (error) {
-    console.warn('播放音频失败:', error);
+  } catch (error: unknown) {
+    console.warn("播放音频失败:", error);
   }
 }
 
@@ -122,8 +123,8 @@ function playClickSound() {
     g.connect(globalAudioContext.destination);
     o.start();
     o.stop(globalAudioContext.currentTime + 0.1);
-  } catch (error) {
-    console.warn('播放点击音失败:', error);
+  } catch (error: unknown) {
+    console.warn("播放点击音失败:", error);
   }
 }
 
@@ -150,12 +151,15 @@ function triggerHapticFeedback(type: 'light' | 'medium' | 'heavy' = 'light') {
     }
     
     // iOS 设备的 Haptic Feedback API (如果可用)
-    if ((window as any).DeviceMotionEvent && typeof (window as any).DeviceMotionEvent.requestPermission === 'function') {
+    const deviceMotionEvent = (window as Window & {
+      DeviceMotionEvent?: { requestPermission?: () => Promise<PermissionState> };
+    }).DeviceMotionEvent;
+    if (typeof deviceMotionEvent?.requestPermission === "function") {
       // iOS 的 Haptic Feedback 需要特殊处理，但在 web 中比较有限
       // 这里我们依赖标准的 vibrate API
     }
-  } catch (error) {
-    // 静默失败 - 不是所有设备都支持触觉反馈
+  } catch (error: unknown) {
+    console.debug("Haptic feedback unsupported", error);
   }
 }
 
@@ -176,14 +180,21 @@ function useTicking(enabled: boolean, intervalMs = 200) {
   return tick;
 }
 
-function saveToStorage(key: string, data: any) {
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+function saveToStorage<T>(key: string, data: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (storageError: unknown) {
+    console.warn(`Failed to persist ${key} to storage`, storageError);
+  }
 }
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(key);
     return v ? (JSON.parse(v) as T) : fallback;
-  } catch { return fallback; }
+  } catch (storageError: unknown) {
+    console.warn(`Failed to load ${key} from storage`, storageError);
+    return fallback;
+  }
 }
 
 export default function HotpotTimerApp() {
@@ -272,13 +283,13 @@ export default function HotpotTimerApp() {
     if (vibrateOn) triggerHapticFeedback('light');
     
     const customPrepItem: PrepItem = {
-      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `custom_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       ingredientId: `custom_${Date.now()}`, // 自定义食材的虚拟ID
       name,
       emoji,
       seconds,
       addedAt: Date.now(),
-      isCustom: true
+      isCustom: true,
     };
     
     setPrepList((prev) => [...prev, customPrepItem]);
@@ -814,7 +825,7 @@ function PreparationTab({
                   onClick={() => onAddToPrepList(ing)}
                   className="h-8 px-3 rounded-full text-xs transition-all bg-white border-gray-200 hover:bg-gray-50"
                 >
-                  <span className="text-sm mr-1">{ing.emoji}</span>
+                  <span className="text-sm mr-1">{ing.emoji ?? "🍲"}</span>
                   {ing.name}
                 </Button>
               </motion.div>
@@ -880,7 +891,7 @@ function PreparationTab({
                 onClick={() => onAddToPrepList(ing)}>
                 <CardContent className="p-3">
                   <div className="text-center">
-                    <div className="text-xl mb-1">{ing.emoji}</div>
+                    <div className="text-xl mb-1">{ing.emoji ?? "🍲"}</div>
                     <div className="text-xs font-medium truncate mb-1">{ing.name}</div>
                     <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                       {ing.seconds >= 60 ? `${Math.round(ing.seconds / 60)}分` : `${ing.seconds}s`}
